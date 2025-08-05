@@ -134,6 +134,20 @@ impl StorageList for MemoryStorage {
             items.iter().skip(start).take(end - start + 1).cloned().collect()
         })
     }
+
+    fn lpush(&mut self, key: String, value: Vec<String>) -> usize {
+        log::debug!("LPUSH on key '{}', value '{}'", key, value.join(", "));
+        let list = self.list.entry(key).or_insert_with(Vec::new);
+        for item in value {
+            list.insert(0, item);
+        }
+        list.len()
+    }
+
+    fn llen(&self, key: &str) -> usize {
+        log::debug!("LLEN on key '{}'", key);
+        self.list.get(key).map_or(0, |list| list.len())
+    }
 }
 
 impl Default for MemoryStorage {

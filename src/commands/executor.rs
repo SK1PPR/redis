@@ -57,6 +57,14 @@ impl CommandExecutor for RedisCommandExecutor {
                 let length = self.storage.rpush(key, value);
                 RedisResponse::Integer(length as i64)
             }
+            RedisCommand::LPUSH(key, value) => {
+                let length = self.storage.lpush(key, value);
+                RedisResponse::Integer(length as i64)
+            }
+            RedisCommand::LLEN(key) => {
+                let length = self.storage.llen(&key);
+                RedisResponse::Integer(length as i64)
+            }
             RedisCommand::LRANGE(key, start , end ) => {
                 let list = self.storage.lrange(&key, start, end);
                 match list {

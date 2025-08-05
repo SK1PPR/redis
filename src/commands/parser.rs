@@ -19,6 +19,8 @@ impl CommandParser {
             "EXISTS" => Self::parse_exists(&args),
             "RPUSH" => Self::parse_rpush(&args),
             "LRANGE" => Self::parse_lrange(&args),
+            "LPUSH" => Self::parse_lpush(&args),
+            "LLEN" => Self::parse_llen(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -93,5 +95,19 @@ impl CommandParser {
         let start: i64 = args[2].parse().map_err(|_| "Invalid start index".to_string())?;
         let end: i64 = args[3].parse().map_err(|_| "Invalid end index".to_string())?;
         Ok(RedisCommand::LRANGE(args[1].clone(), start, end))
+    }
+
+    fn parse_lpush(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 3 {
+            return Err("Wrong number of arguments for LPUSH".to_string());
+        }
+        Ok(RedisCommand::LPUSH(args[1].clone(), args[2..].to_vec()))
+    }
+
+    fn parse_llen(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for LLEN".to_string());
+        }
+        Ok(RedisCommand::LLEN(args[1].clone()))
     }
 }
