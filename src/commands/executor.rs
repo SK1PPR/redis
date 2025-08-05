@@ -62,12 +62,12 @@ impl CommandExecutor for RedisCommandExecutor {
                 match list {
                     Some(items) => {
                         if items.is_empty() {
-                            RedisResponse::nil()
+                            RedisResponse::Array(vec![])
                         } else {
                             RedisResponse::Array(items.into_iter().map(|item| RedisResponse::SimpleString(item)).collect())
                         }
                     }
-                    None => RedisResponse::nil(),
+                    None => RedisResponse::Array(vec![]),
                 }
             }
         }

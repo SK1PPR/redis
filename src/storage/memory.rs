@@ -94,6 +94,28 @@ impl StorageList for MemoryStorage {
 
     fn lrange(&self, key: &str, start: usize, end: usize) -> Option<Vec<String>> {
         log::debug!("LRANGE on key '{}', start {}, end {}", key, start, end);
+
+        if !self.list.contains_key(key) {
+            log::debug!("Key '{}' does not exist in list", key);
+            return None;
+        }
+
+        if start > end {
+            log::debug!("Invalid range: start {} is greater than end {}", start, end);
+            return None;
+        }
+
+        if start >= self.list.get(key)?.len() {
+            log::debug!("Start index {} is out of bounds for key '{}'", start, key);
+            return Some(vec![]); // Return empty list if start is out of bounds
+        }
+
+        let end = if end >= self.list.get(key)?.len() {
+            self.list.get(key)?.len() - 1 // Adjust end to the last index if it exceeds the list length
+        } else {
+            end
+        };
+
         self.list.get(key).map(|items| {
             items.iter().skip(start).take(end - start + 1).cloned().collect()
         })
