@@ -148,6 +148,24 @@ impl StorageList for MemoryStorage {
         log::debug!("LLEN on key '{}'", key);
         self.list.get(key).map_or(0, |list| list.len())
     }
+
+    fn lpop(&mut self, key: &str, count: usize) -> Option<Vec<String>> {
+        log::debug!("LPOP on key '{}', count {}", key, count);
+        if let Some(list) = self.list.get_mut(key) {
+            if list.is_empty() {
+                log::debug!("List for key '{}' is empty", key);
+                return Some(vec![]);
+            }
+            let items_to_pop = list.drain(0..count.min(list.len())).collect();
+            if list.is_empty() {
+                self.list.remove(key); // Remove the key if the list is empty after popping
+            }
+            Some(items_to_pop)
+        } else {
+            log::debug!("Key '{}' does not exist in list", key);
+            None
+        }
+    }
 }
 
 impl Default for MemoryStorage {

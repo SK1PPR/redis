@@ -21,6 +21,7 @@ impl CommandParser {
             "LRANGE" => Self::parse_lrange(&args),
             "LPUSH" => Self::parse_lpush(&args),
             "LLEN" => Self::parse_llen(&args),
+            "LPOP" => Self::parse_lpop(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -109,5 +110,17 @@ impl CommandParser {
             return Err("Wrong number of arguments for LLEN".to_string());
         }
         Ok(RedisCommand::LLEN(args[1].clone()))
+    }
+
+    fn parse_lpop(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 2 || args.len() > 3 {
+            return Err("Wrong number of arguments for LPOP".to_string());
+        }
+        let count = if args.len() == 3 {
+            Some(args[2].parse::<i64>().map_err(|_| "Invalid count value".to_string())?)
+        } else {
+            None
+        };
+        Ok(RedisCommand::LPOP(args[1].clone(), count))
     }
 }

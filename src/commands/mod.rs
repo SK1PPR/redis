@@ -19,4 +19,5 @@ pub enum RedisCommand {
     LRANGE(String, i64, i64),
     LPUSH(String, Vec<String>),
     LLEN(String),
+    LPOP(String, Option<i64>),
 }

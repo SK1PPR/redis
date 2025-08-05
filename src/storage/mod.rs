@@ -17,4 +17,5 @@ pub trait StorageList {
     fn lrange(&self, key: &str, start: i64, end: i64) -> Option<Vec<String>>;
     fn lpush(&mut self, key: String, value: Vec<String>) -> usize;
     fn llen(&self, key: &str) -> usize;
+    fn lpop(&mut self, key: &str, count: usize) -> Option<Vec<String>>;
 }

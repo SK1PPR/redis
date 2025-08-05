@@ -78,6 +78,23 @@ impl CommandExecutor for RedisCommandExecutor {
                     None => RedisResponse::Array(vec![]),
                 }
             }
+            RedisCommand::LPOP(key, count) => {
+                let count = count.unwrap_or(1) as usize; // Default to 1 if not specified
+                match self.storage.lpop(&key, count) {
+                    Some(items) => {
+                        if items.is_empty() {
+                            RedisResponse::nil()
+                        } else {
+                            if count == 1 {
+                                RedisResponse::BulkString(Some(items[0].clone()))
+                            } else {
+                                RedisResponse::Array(items.into_iter().map(|item| RedisResponse::SimpleString(item)).collect())
+                            }
+                        }
+                    }
+                    None => RedisResponse::nil(),
+                }
+            }
         }
     }
 }
