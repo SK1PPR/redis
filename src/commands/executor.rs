@@ -49,6 +49,10 @@ impl CommandExecutor for RedisCommandExecutor {
                 let exists = self.storage.exists_multiple(&keys);
                 RedisResponse::Integer(exists as i64)
             }
+            RedisCommand::SetWithExpiry(key, value, expiry) => {
+                self.storage.set_with_expiry(key, value, expiry);
+                RedisResponse::ok()
+            }
         }
     }
 }

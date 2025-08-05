@@ -4,51 +4,67 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct MemoryStorage {
     data: HashMap<String, String>,
+    expiry: HashMap<String, u128>,
 }
 
 impl MemoryStorage {
     pub fn new() -> Self {
         Self {
             data: HashMap::new(),
+            expiry: HashMap::new(),
         }
     }
-    
+
     pub fn len(&self) -> usize {
         self.data.len()
     }
-    
+
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
-    
+
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    
+
     pub fn keys(&self) -> impl Iterator<Item = &String> {
         self.data.keys()
     }
 }
 
 impl Storage for MemoryStorage {
-    fn get(&self, key: &str) -> Option<String> {
+    fn get(&mut self, key: &str) -> Option<String> {
+        log::debug!("Getting value for key '{}'", key);
+        if let Some(expiry_time) = self.expiry.get(key) {
+            if *expiry_time < std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() {
+                log::debug!("Key '{}' has expired", key);
+                self.delete(key);
+                return None; // Key has expired
+            }
+        }
         self.data.get(key).cloned()
     }
-    
+
     fn set(&mut self, key: String, value: String) {
         log::debug!("Setting key '{}' to '{}'", key, value);
         self.data.insert(key, value);
     }
-    
+
+    fn set_with_expiry(&mut self, key: String, value: String, expiry: u128) {
+        log::debug!("Setting expiry for key '{}' to {}", key, expiry);
+        self.data.insert(key.clone(), value);
+        self.expiry.insert(key, expiry + std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis());
+    }
+
     fn delete(&mut self, key: &str) -> bool {
         log::debug!("Deleting key '{}'", key);
         self.data.remove(key).is_some()
     }
-    
+
     fn exists(&self, key: &str) -> bool {
         self.data.contains_key(key)
     }
-    
+
     fn delete_multiple(&mut self, keys: Vec<String>) -> usize {
         let mut deleted = 0;
         for key in keys {
@@ -58,11 +74,9 @@ impl Storage for MemoryStorage {
         }
         deleted
     }
-    
+
     fn exists_multiple(&self, keys: &[String]) -> usize {
-        keys.iter()
-            .filter(|key| self.exists(key))
-            .count()
+        keys.iter().filter(|key| self.exists(key)).count()
     }
 }
 

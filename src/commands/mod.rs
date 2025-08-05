@@ -12,6 +12,7 @@ pub enum RedisCommand {
     Echo(String),
     Get(String),
     Set(String, String),
+    SetWithExpiry(String, String, u128),
     Del(Vec<String>),
     Exists(Vec<String>),
 }

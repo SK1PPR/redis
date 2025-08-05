@@ -44,10 +44,23 @@ impl CommandParser {
     }
     
     fn parse_set(args: &[String]) -> Result<RedisCommand, String> {
-        if args.len() != 3 {
+        if args.len() == 3 {
+            Ok(RedisCommand::Set(args[1].clone(), args[2].clone()))
+        } else if args.len() == 5 {
+            if args[3].to_ascii_uppercase() == "EX" {
+                let expiry: u128 = args[4].parse().map_err(|_| "Invalid expiry value".to_string())?;
+                Ok(RedisCommand::SetWithExpiry(args[1].clone(), args[2].clone(), expiry * 1000)) // Convert seconds to milliseconds
+            }
+            else if args[3].to_ascii_uppercase() == "PX" {
+                let expiry: u128 = args[4].parse().map_err(|_| "Invalid expiry value".to_string())?;
+                Ok(RedisCommand::SetWithExpiry(args[1].clone(), args[2].clone(), expiry))
+            } else {
+                return Err("Invalid SET command format".to_string());
+            }
+            
+        } else {
             return Err("Wrong number of arguments for SET".to_string());
         }
-        Ok(RedisCommand::Set(args[1].clone(), args[2].clone()))
     }
     
     fn parse_del(args: &[String]) -> Result<RedisCommand, String> {
