@@ -1,10 +1,11 @@
-use super::Storage;
+use super::{Storage, StorageList};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct MemoryStorage {
     data: HashMap<String, String>,
     expiry: HashMap<String, u128>,
+    list: HashMap<String, Vec<String>>,
 }
 
 impl MemoryStorage {
@@ -12,6 +13,7 @@ impl MemoryStorage {
         Self {
             data: HashMap::new(),
             expiry: HashMap::new(),
+            list: HashMap::new(),
         }
     }
 
@@ -77,6 +79,15 @@ impl Storage for MemoryStorage {
 
     fn exists_multiple(&self, keys: &[String]) -> usize {
         keys.iter().filter(|key| self.exists(key)).count()
+    }
+}
+
+impl StorageList for MemoryStorage {
+    fn rpush(&mut self, key: String, value: String) -> usize {
+        log::debug!("RPUSH on key '{}', value '{}'", key, value);
+        let list = self.list.entry(key).or_insert_with(Vec::new);
+        list.push(value);
+        list.len()
     }
 }
 

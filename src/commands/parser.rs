@@ -17,6 +17,7 @@ impl CommandParser {
             "SET" => Self::parse_set(&args),
             "DEL" => Self::parse_del(&args),
             "EXISTS" => Self::parse_exists(&args),
+            "RPUSH" => Self::parse_rpush(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -75,5 +76,12 @@ impl CommandParser {
             return Err("Wrong number of arguments for EXISTS".to_string());
         }
         Ok(RedisCommand::Exists(args[1..].to_vec()))
+    }
+
+    fn parse_rpush(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for RPUSH".to_string());
+        }
+        Ok(RedisCommand::RPUSH(args[1].clone(), args[2].clone()))
     }
 }

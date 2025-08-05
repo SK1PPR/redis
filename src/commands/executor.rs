@@ -1,5 +1,5 @@
 use super::{RedisCommand, RedisResponse};
-use crate::storage::{MemoryStorage, Storage};
+use crate::storage::{MemoryStorage, Storage, StorageList};
 
 pub trait CommandExecutor {
     fn execute(&mut self, command: RedisCommand) -> RedisResponse;
@@ -52,6 +52,10 @@ impl CommandExecutor for RedisCommandExecutor {
             RedisCommand::SetWithExpiry(key, value, expiry) => {
                 self.storage.set_with_expiry(key, value, expiry);
                 RedisResponse::ok()
+            }
+            RedisCommand::RPUSH(key, value) => {
+                let length = self.storage.rpush(key, value);
+                RedisResponse::Integer(length as i64)
             }
         }
     }

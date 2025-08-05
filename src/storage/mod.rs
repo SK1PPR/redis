@@ -11,3 +11,7 @@ pub trait Storage {
     fn exists_multiple(&self, keys: &[String]) -> usize;
     fn set_with_expiry(&mut self, key: String, value: String, expiry: u128);
 }
+
+pub trait StorageList {
+    fn rpush(&mut self, key: String, value: String) -> usize;
+}
