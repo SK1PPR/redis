@@ -57,6 +57,19 @@ impl CommandExecutor for RedisCommandExecutor {
                 let length = self.storage.rpush(key, value);
                 RedisResponse::Integer(length as i64)
             }
+            RedisCommand::LRANGE(key, start , end ) => {
+                let list = self.storage.lrange(&key, start, end);
+                match list {
+                    Some(items) => {
+                        if items.is_empty() {
+                            RedisResponse::nil()
+                        } else {
+                            RedisResponse::Array(items.into_iter().map(|item| RedisResponse::SimpleString(item)).collect())
+                        }
+                    }
+                    None => RedisResponse::nil(),
+                }
+            }
         }
     }
 }

@@ -91,6 +91,13 @@ impl StorageList for MemoryStorage {
         }
         list.len()
     }
+
+    fn lrange(&self, key: &str, start: usize, end: usize) -> Option<Vec<String>> {
+        log::debug!("LRANGE on key '{}', start {}, end {}", key, start, end);
+        self.list.get(key).map(|items| {
+            items.iter().skip(start).take(end - start + 1).cloned().collect()
+        })
+    }
 }
 
 impl Default for MemoryStorage {
