@@ -16,5 +16,5 @@ pub enum RedisCommand {
     Del(Vec<String>),
     Exists(Vec<String>),
     RPUSH(String, Vec<String>),
-    LRANGE(String, usize, usize)
+    LRANGE(String, i64, i64)
 }

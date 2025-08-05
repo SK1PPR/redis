@@ -14,5 +14,5 @@ pub trait Storage {
 
 pub trait StorageList {
     fn rpush(&mut self, key: String, value: Vec<String>) -> usize;
-    fn lrange(&self, key: &str, start: usize, end: usize) -> Option<Vec<String>>;
+    fn lrange(&self, key: &str, start: i64, end: i64) -> Option<Vec<String>>;
 }

@@ -90,8 +90,8 @@ impl CommandParser {
         if args.len() != 4 {
             return Err("Wrong number of arguments for LRANGE".to_string());
         }
-        let start: usize = args[2].parse().map_err(|_| "Invalid start index".to_string())?;
-        let end: usize = args[3].parse().map_err(|_| "Invalid end index".to_string())?;
+        let start: i64 = args[2].parse().map_err(|_| "Invalid start index".to_string())?;
+        let end: i64 = args[3].parse().map_err(|_| "Invalid end index".to_string())?;
         Ok(RedisCommand::LRANGE(args[1].clone(), start, end))
     }
 }
