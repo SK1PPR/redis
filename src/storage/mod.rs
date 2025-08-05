@@ -13,5 +13,5 @@ pub trait Storage {
 }
 
 pub trait StorageList {
-    fn rpush(&mut self, key: String, value: String) -> usize;
+    fn rpush(&mut self, key: String, value: Vec<String>) -> usize;
 }

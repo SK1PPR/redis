@@ -83,10 +83,12 @@ impl Storage for MemoryStorage {
 }
 
 impl StorageList for MemoryStorage {
-    fn rpush(&mut self, key: String, value: String) -> usize {
-        log::debug!("RPUSH on key '{}', value '{}'", key, value);
+    fn rpush(&mut self, key: String, value: Vec<String>) -> usize {
+        log::debug!("RPUSH on key '{}', value '{}'", key, value.join(", "));
         let list = self.list.entry(key).or_insert_with(Vec::new);
-        list.push(value);
+        for item in value {
+            list.push(item);
+        }
         list.len()
     }
 }

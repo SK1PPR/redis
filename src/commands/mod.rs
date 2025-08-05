@@ -15,5 +15,5 @@ pub enum RedisCommand {
     SetWithExpiry(String, String, u128),
     Del(Vec<String>),
     Exists(Vec<String>),
-    RPUSH(String, String)
+    RPUSH(String, Vec<String>)
 }
