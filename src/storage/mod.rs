@@ -1,6 +1,8 @@
 pub mod memory;
+pub mod unit;
 
 pub use memory::MemoryStorage;
+pub use unit::Unit;
 
 pub trait Storage {
     fn get(&mut self, key: &str) -> Option<String>;
