@@ -20,4 +20,6 @@ pub enum RedisCommand {
     LPUSH(String, Vec<String>),
     LLEN(String),
     LPOP(String, Option<i64>),
+    BLPOP(Vec<String>, i64),
+    BRPOP(Vec<String>, i64),
 }

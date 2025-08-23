@@ -7,6 +7,8 @@ pub enum RedisResponse {
     Integer(i64),
     Array(Vec<RedisResponse>),
     Error(String),
+    BLPOPResponse(Vec<(String, i64)>),
+    BRPOPResponse(Vec<(String, i64)>),
 }
 
 impl RedisResponse {
@@ -24,6 +26,9 @@ impl RedisResponse {
                 result
             }
             RedisResponse::Error(e) => format!("-ERR {}\r\n", e),
+            RedisResponse::BLPOPResponse(_) | RedisResponse::BRPOPResponse(_) => {
+                "".to_string() // Empty response as response after non-block
+            }
         }
     }
     

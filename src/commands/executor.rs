@@ -95,6 +95,14 @@ impl CommandExecutor for RedisCommandExecutor {
                     None => RedisResponse::nil(),
                 }
             }
+            RedisCommand::BLPOP(keys, timeout) => {
+                // Blocking pop is not implemented in this in-memory storage
+                RedisResponse::error("BLPOP not implemented")
+            }
+            RedisCommand::BRPOP(keys, timeout) => {
+                // Blocking pop is not implemented in this in-memory storage
+                RedisResponse::error("BRPOP not implemented")
+            }
         }
     }
 }

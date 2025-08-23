@@ -22,6 +22,8 @@ impl CommandParser {
             "LPUSH" => Self::parse_lpush(&args),
             "LLEN" => Self::parse_llen(&args),
             "LPOP" => Self::parse_lpop(&args),
+            "BLPOP" => Self::parse_blpop(&args),
+            "BRPOP" => Self::parse_brpop(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -122,5 +124,23 @@ impl CommandParser {
             None
         };
         Ok(RedisCommand::LPOP(args[1].clone(), count))
+    }
+
+    fn parse_blpop(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 3 {
+            return Err("Wrong number of arguments for BLPOP".to_string());
+        }
+        let timeout = args.last().unwrap().parse::<i64>().map_err(|_| "Invalid timeout value".to_string())?;
+        let keys = args[1..args.len()-1].to_vec();
+        Ok(RedisCommand::BLPOP(keys, timeout))
+    }
+
+    fn parse_brpop(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 3 {
+            return Err("Wrong number of arguments for BRPOP".to_string());
+        }
+        let timeout = args.last().unwrap().parse::<i64>().map_err(|_| "Invalid timeout value".to_string())?;
+        let keys = args[1..args.len()-1].to_vec();
+        Ok(RedisCommand::BRPOP(keys, timeout))
     }
 }

@@ -1,10 +1,12 @@
 use mio::{net::TcpStream, Token};
 use std::io::{self, Read, Write, ErrorKind};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ClientState {
     Reading,
     Writing,
+    BlockedOnBlpop(Vec<String>),
+    BlockedOnBrpop(Vec<String>),
     Closed,
 }
 
@@ -30,6 +32,11 @@ impl Client {
     }
     
     pub fn read_data(&mut self) -> io::Result<usize> {
+
+        if self.state != ClientState::Reading {
+            return Ok(0);
+        }
+
         let mut temp_buffer = [0u8; 4096];
         let mut total_read = 0;
         
@@ -124,5 +131,28 @@ impl Client {
     pub fn extract_read_data(&mut self, bytes: usize) -> Vec<u8> {
         let data = self.read_buffer.drain(..bytes).collect();
         data
+    }
+
+    pub fn set_blocked_on_blpop(&mut self, keys: Vec<String>) {
+        self.state = ClientState::BlockedOnBlpop(keys);
+    }
+
+    pub fn set_blocked_on_brpop(&mut self, keys: Vec<String>) {
+        self.state = ClientState::BlockedOnBrpop(keys);
+    }
+
+    pub fn unblock(&mut self) {
+        self.state = ClientState::Reading;
+    }
+
+    pub fn is_blocked(&self) -> bool {
+        matches!(self.state, ClientState::BlockedOnBlpop(_) | ClientState::BlockedOnBrpop(_))
+    }
+
+    pub fn get_blocked_keys(&self) -> Option<&Vec<String>> {
+        match &self.state {
+            ClientState::BlockedOnBlpop(keys) | ClientState::BlockedOnBrpop(keys) => Some(keys),
+            _ => None,
+        }
     }
 }
