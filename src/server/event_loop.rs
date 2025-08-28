@@ -294,12 +294,12 @@ impl EventLoop {
         Ok(())
     }
 
-    fn block_client_internal(&mut self, token: Token, timeout_secs: u32) -> io::Result<()> {
+    fn block_client_internal(&mut self, token: Token, timeout_secs: f64) -> io::Result<()> {
         if let Some(client) = self.clients.get_mut(&token) {
             client.block();
 
             // Set timeout if specified
-            if timeout_secs > 0 {
+            if timeout_secs != 0.0 {
                 let timeout_instant = Instant::now() + Duration::from_secs(timeout_secs as u64);
                 self.blocked_clients_timeout.insert(token, timeout_instant);
             }

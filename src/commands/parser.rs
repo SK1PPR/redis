@@ -151,7 +151,7 @@ impl CommandParser {
         let timeout = args
             .last()
             .unwrap()
-            .parse::<u32>()
+            .parse::<f64>()
             .map_err(|_| "Invalid timeout value".to_string())?;
         let keys = args[1..args.len() - 1].to_vec();
         Ok(RedisCommand::BLPOP(keys, timeout))
@@ -164,7 +164,7 @@ impl CommandParser {
         let timeout = args
             .last()
             .unwrap()
-            .parse::<u32>()
+            .parse::<f64>()
             .map_err(|_| "Invalid timeout value".to_string())?;
         let keys = args[1..args.len() - 1].to_vec();
         Ok(RedisCommand::BRPOP(keys, timeout))
