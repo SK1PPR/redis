@@ -310,7 +310,7 @@ impl StorageList for MemoryStorage {
                 .unwrap();
 
             // Insert at the beginning (prepend)
-            for (i, item) in value.iter().enumerate() {
+            for (i, item) in value.iter().rev().enumerate() {
                 list.insert(i, item.clone());
             }
             list.len()
