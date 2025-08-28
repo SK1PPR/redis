@@ -1,6 +1,6 @@
-use mio::{net::TcpStream, Token};
-use std::io::{self, Read, Write, ErrorKind};
 use crate::RedisCommand;
+use mio::{net::TcpStream, Token};
+use std::io::{self, ErrorKind, Read, Write};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ClientState {
@@ -8,7 +8,6 @@ pub enum ClientState {
     Writing,
     Blocked,
     Closed,
-    Multi,
 }
 
 pub struct Client {
@@ -33,16 +32,15 @@ impl Client {
             execution_queue: Vec::new(),
         }
     }
-    
-    pub fn read_data(&mut self) -> io::Result<usize> {
 
+    pub fn read_data(&mut self) -> io::Result<usize> {
         if self.state != ClientState::Reading {
             return Ok(0);
         }
 
         let mut temp_buffer = [0u8; 4096];
         let mut total_read = 0;
-        
+
         loop {
             match self.socket.read(&mut temp_buffer) {
                 Ok(0) => {
@@ -67,17 +65,17 @@ impl Client {
                 }
             }
         }
-        
+
         Ok(total_read)
     }
-    
+
     pub fn write_data(&mut self) -> io::Result<usize> {
         if self.write_pos >= self.write_buffer.len() {
             return Ok(0);
         }
-        
+
         let mut total_written = 0;
-        
+
         loop {
             match self.socket.write(&self.write_buffer[self.write_pos..]) {
                 Ok(0) => {
@@ -89,7 +87,7 @@ impl Client {
                     log::debug!("Wrote {} bytes to client {}", n, self.token.0);
                     self.write_pos += n;
                     total_written += n;
-                    
+
                     if self.write_pos >= self.write_buffer.len() {
                         // Finished writing all data
                         self.clear_write_buffer();
@@ -108,29 +106,33 @@ impl Client {
                 }
             }
         }
-        
+
         Ok(total_written)
     }
-    
+
     pub fn add_response(&mut self, response: String) {
-        log::debug!("Adding response to client {}: {}", self.token.0, response.trim());
+        log::debug!(
+            "Adding response to client {}: {}",
+            self.token.0,
+            response.trim()
+        );
         self.write_buffer.extend_from_slice(response.as_bytes());
         self.state = ClientState::Writing;
     }
-    
+
     pub fn has_pending_writes(&self) -> bool {
         self.write_pos < self.write_buffer.len()
     }
-    
+
     pub fn clear_write_buffer(&mut self) {
         self.write_buffer.clear();
         self.write_pos = 0;
     }
-    
+
     pub fn is_closed(&self) -> bool {
         matches!(self.state, ClientState::Closed)
     }
-    
+
     pub fn extract_read_data(&mut self, bytes: usize) -> Vec<u8> {
         let data = self.read_buffer.drain(..bytes).collect();
         data
@@ -146,18 +148,5 @@ impl Client {
 
     pub fn is_blocked(&self) -> bool {
         matches!(self.state, ClientState::Blocked)
-    }
-
-    pub fn enter_multi(&mut self) {
-        self.state = ClientState::Multi;
-    }
-
-    pub fn exit_multi(&mut self) {
-        self.state = ClientState::Reading;
-        self.execution_queue.clear();
-    }
-
-    pub fn is_multi(&self) -> bool {
-        matches!(self.state, ClientState::Multi)
     }
 }

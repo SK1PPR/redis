@@ -45,6 +45,10 @@ impl RedisResponse {
     pub fn error(msg: &str) -> Self {
         RedisResponse::Error(msg.to_string())
     }
+
+    pub fn queued() -> Self {
+        RedisResponse::SimpleString("QUEUED".to_string())
+    }
 }
 
 impl fmt::Display for RedisResponse {

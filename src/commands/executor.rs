@@ -24,6 +24,12 @@ pub trait Transactions {
     fn start_transaction(&mut self, token: mio::Token);
     fn exec_transaction(&mut self, token: mio::Token);
     fn discard_transaction(&mut self, token: mio::Token);
+    fn is_transaction_command(&self, command: &RedisCommand) -> bool {
+        matches!(
+            command,
+            RedisCommand::MULTI | RedisCommand::EXEC | RedisCommand::DISCARD
+        )
+    }
 }
 
 impl Transactions for RedisCommandExecutor {

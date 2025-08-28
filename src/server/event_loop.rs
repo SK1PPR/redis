@@ -1,11 +1,12 @@
 use super::client::Client;
 use super::event_loop_handle::{EventLoopHandle, EventLoopMessage};
+use crate::commands::executor::Transactions;
 use crate::commands::{CommandExecutor, CommandParser, RedisCommandExecutor};
 use crate::protocol::RespParser;
 use crate::RedisResponse;
 use mio::net::TcpListener;
 use mio::{Events, Interest, Poll, Token, Waker};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
@@ -30,6 +31,9 @@ pub struct EventLoop {
 
     // Blocking operation tracking
     blocked_clients_timeout: HashMap<Token, Instant>,
+
+    // Multi operation tracking
+    multi_clients: HashSet<Token>,
 }
 
 impl EventLoop {
@@ -56,6 +60,7 @@ impl EventLoop {
             message_receiver: receiver,
             event_loop_handle: handle,
             blocked_clients_timeout: HashMap::new(),
+            multi_clients: HashSet::new(),
         })
     }
 
@@ -275,32 +280,19 @@ impl EventLoop {
             );
 
             let client = self.clients.get_mut(&token).unwrap();
-            if client.is_multi() {
-                // Queue command for later execution
-                match CommandParser::parse(command_args) {
-                    Ok(command) => {
-                        client.execution_queue.push(command);
-                        continue;
-                    }
-                    Err(error) => {
-                        let response = RedisResponse::error(&error);
-                        client.add_response(response.to_resp());
-                        if client.has_pending_writes() {
-                            self.poll.registry().reregister(
-                                &mut client.socket,
-                                token,
-                                Interest::WRITABLE,
-                            )?;
-                        }
-                        continue;
-                    }
-                }
-            }
-
             let response = match CommandParser::parse(command_args) {
                 Ok(command) => {
-                    // Execute command with client token for blocking operations
-                    self.command_executor.execute(command, token)
+                    if self.multi_clients.contains(&token)
+                        && !RedisCommandExecutor::is_transaction_command(
+                            &self.command_executor,
+                            &command,
+                        )
+                    {
+                        client.execution_queue.push(command);
+                        RedisResponse::queued()
+                    } else {
+                        self.command_executor.execute(command, token)
+                    }
                 }
                 Err(error) => crate::commands::RedisResponse::error(&error),
             };
@@ -308,7 +300,6 @@ impl EventLoop {
             // For blocking commands, the executor will handle the blocking via the handle
             // We only send responses for non-blocking commands here
             if !matches!(response, RedisResponse::Blocked) {
-                let client = self.clients.get_mut(&token).unwrap();
                 client.add_response(response.to_resp());
 
                 // Switch to write mode if we have data to send
@@ -319,6 +310,20 @@ impl EventLoop {
                         Interest::WRITABLE,
                     )?;
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_response(&mut self, token: Token, response: RedisResponse) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            client.add_response(response.to_resp());
+
+            if client.has_pending_writes() {
+                self.poll
+                    .registry()
+                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
             }
         }
 
@@ -350,17 +355,7 @@ impl EventLoop {
             if client.is_blocked() {
                 client.unblock();
                 self.blocked_clients_timeout.remove(&token);
-                client.add_response(response.to_resp());
-
-                log::debug!("Unblocking client {}", token.0);
-
-                if client.has_pending_writes() {
-                    self.poll.registry().reregister(
-                        &mut client.socket,
-                        token,
-                        Interest::WRITABLE,
-                    )?;
-                }
+                return self.write_response(token, response);
             }
         }
 
@@ -368,34 +363,16 @@ impl EventLoop {
     }
 
     fn start_multi_internal(&mut self, token: Token) -> io::Result<()> {
-        if let Some(client) = self.clients.get_mut(&token) {
-            if client.is_multi() {
-                let response = RedisResponse::error("MULTI calls can not be nested");
-                client.add_response(response.to_resp());
-
-                if client.has_pending_writes() {
-                    self.poll.registry().reregister(
-                        &mut client.socket,
-                        token,
-                        Interest::WRITABLE,
-                    )?;
-                }
-
-                return Ok(());
+        if let Some(_) = self.clients.get_mut(&token) {
+            if self.multi_clients.contains(&token) {
+                return self.write_response(
+                    token,
+                    RedisResponse::Error("MULTI calls can not be nested".to_string()),
+                );
             }
-            client.enter_multi();
-        }
 
-        // Return OK response for MULTI
-        let response = RedisResponse::ok();
-        if let Some(client) = self.clients.get_mut(&token) {
-            client.add_response(response.to_resp());
-
-            if client.has_pending_writes() {
-                self.poll
-                    .registry()
-                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
-            }
+            self.multi_clients.insert(token);
+            return self.write_response(token, RedisResponse::ok());
         }
 
         Ok(())
@@ -403,21 +380,16 @@ impl EventLoop {
 
     fn discard_queue_internal(&mut self, token: Token) -> io::Result<()> {
         if let Some(client) = self.clients.get_mut(&token) {
-            if !client.is_multi() {
-                let response = RedisResponse::error("DISCARD without MULTI");
-                client.add_response(response.to_resp());
-
-                if client.has_pending_writes() {
-                    self.poll.registry().reregister(
-                        &mut client.socket,
-                        token,
-                        Interest::WRITABLE,
-                    )?;
-                }
-
-                return Ok(());
+            if !self.multi_clients.contains(&token) {
+                return self.write_response(
+                    token,
+                    RedisResponse::Error("DISCARD without MULTI".to_string()),
+                );
             }
-            client.exit_multi();
+
+            client.execution_queue.clear();
+            self.multi_clients.remove(&token);
+            self.write_response(token, RedisResponse::ok())?;
         }
 
         Ok(())
@@ -425,19 +397,11 @@ impl EventLoop {
 
     fn exec_queue_internal(&mut self, token: Token) -> io::Result<()> {
         if let Some(client) = self.clients.get_mut(&token) {
-            if !client.is_multi() {
-                let response = RedisResponse::error("EXEC without MULTI");
-                client.add_response(response.to_resp());
-
-                if client.has_pending_writes() {
-                    self.poll.registry().reregister(
-                        &mut client.socket,
-                        token,
-                        Interest::WRITABLE,
-                    )?;
-                }
-
-                return Ok(());
+            if !self.multi_clients.contains(&token) {
+                return self.write_response(
+                    token,
+                    RedisResponse::Error("EXEC without MULTI".to_string()),
+                );
             }
 
             let mut responses = Vec::new();
@@ -445,16 +409,9 @@ impl EventLoop {
                 let response = self.command_executor.execute(command, token);
                 responses.push(response);
             }
-            client.exit_multi();
 
-            let array_response = RedisResponse::Array(responses);
-            client.add_response(array_response.to_resp());
-
-            if client.has_pending_writes() {
-                self.poll
-                    .registry()
-                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
-            }
+            self.multi_clients.remove(&token);
+            self.write_response(token, RedisResponse::Array(responses))?;
         }
 
         Ok(())
