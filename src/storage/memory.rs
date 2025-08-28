@@ -206,6 +206,22 @@ impl Storage for MemoryStorage {
     fn exists_multiple(&self, keys: &[String]) -> usize {
         keys.iter().filter(|key| self.exists(key)).count()
     }
+
+    fn incr(&mut self, key: String) -> i64 {
+        log::debug!("Incrementing value for key '{}'", key);
+        let current_value = self.get(&key).unwrap_or_else(|| "0".to_string());
+        match current_value.parse::<i64>() {
+            Ok(num) => {
+                let new_value = num + 1;
+                self.set(key, new_value.to_string());
+                new_value
+            }
+            Err(_) => {
+                log::debug!("Value for key '{}' is not an integer", key);
+                0 // or handle error as needed
+            }
+        }
+    }
 }
 
 impl StorageList for MemoryStorage {

@@ -24,6 +24,7 @@ impl CommandParser {
             "LPOP" => Self::parse_lpop(&args),
             "BLPOP" => Self::parse_blpop(&args),
             "BRPOP" => Self::parse_brpop(&args),
+            "INCR" => Self::parse_incr(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -172,5 +173,12 @@ impl CommandParser {
         let timeout = (timeout * 1000.0) as u64;
         let keys = args[1..args.len() - 1].to_vec();
         Ok(RedisCommand::BRPOP(keys, timeout))
+    }
+
+    fn parse_incr(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for INCR".to_string());
+        }
+        Ok(RedisCommand::INCR(args[1].clone()))
     }
 }

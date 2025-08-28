@@ -114,6 +114,9 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
                 return RedisResponse::Blocked;
             }
+            RedisCommand::INCR(key) => {
+                return RedisResponse::Integer(self.storage.incr(key));
+            }
         }
     }
 }
