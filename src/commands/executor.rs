@@ -8,13 +8,35 @@ pub trait CommandExecutor {
 }
 pub struct RedisCommandExecutor {
     storage: MemoryStorage,
+    handle: EventLoopHandle,
 }
 
 impl RedisCommandExecutor {
     pub fn new(handle: EventLoopHandle) -> Self {
         Self {
-            storage: MemoryStorage::new(handle),
+            storage: MemoryStorage::new(handle.clone()),
+            handle,
         }
+    }
+}
+
+pub trait Transactions {
+    fn start_transaction(&mut self, token: mio::Token);
+    fn exec_transaction(&mut self, token: mio::Token);
+    fn discard_transaction(&mut self, token: mio::Token);
+}
+
+impl Transactions for RedisCommandExecutor {
+    fn start_transaction(&mut self, token: mio::Token) {
+        self.handle.start_multi(token);
+    }
+
+    fn exec_transaction(&mut self, token: mio::Token) {
+        self.handle.execute_queue(token);
+    }
+
+    fn discard_transaction(&mut self, token: mio::Token) {
+        self.handle.discard_queue(token);
     }
 }
 
@@ -114,11 +136,21 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
                 return RedisResponse::Blocked;
             }
-            RedisCommand::INCR(key) => {
-                match self.storage.incr(key) {
-                    Some(value) => RedisResponse::Integer(value),
-                    None => RedisResponse::error("value is not an integer or out of range"),
-                }
+            RedisCommand::INCR(key) => match self.storage.incr(key) {
+                Some(value) => RedisResponse::Integer(value),
+                None => RedisResponse::error("value is not an integer or out of range"),
+            }
+            RedisCommand::MULTI => {
+                self.start_transaction(token);
+                RedisResponse::Empty
+            }
+            RedisCommand::EXEC => {
+                self.exec_transaction(token);
+                RedisResponse::Empty
+            }
+            RedisCommand::DISCARD => {
+                self.discard_transaction(token);
+                RedisResponse::Empty
             }
         }
     }

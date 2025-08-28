@@ -22,5 +22,8 @@ pub enum RedisCommand {
     LPOP(String, Option<i64>),
     BLPOP(Vec<String>, u64),
     BRPOP(Vec<String>, u64),
-    INCR(String)
+    INCR(String),
+    MULTI,
+    EXEC,
+    DISCARD,
 }

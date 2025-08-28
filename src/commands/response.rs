@@ -8,6 +8,7 @@ pub enum RedisResponse {
     Array(Vec<RedisResponse>),
     Error(String),
     Blocked, // Timeout in seconds
+    Empty,
 }
 
 impl RedisResponse {
@@ -25,24 +26,22 @@ impl RedisResponse {
                 result
             }
             RedisResponse::Error(e) => format!("-ERR {}\r\n", e),
-            RedisResponse::Blocked => {
-                "".to_string() // Empty response as response after non-block
-            }
+            RedisResponse::Empty | RedisResponse::Blocked => "".to_string(),
         }
     }
-    
+
     pub fn ok() -> Self {
         RedisResponse::SimpleString("OK".to_string())
     }
-    
+
     pub fn pong() -> Self {
         RedisResponse::SimpleString("PONG".to_string())
     }
-    
+
     pub fn nil() -> Self {
         RedisResponse::BulkString(None)
     }
-    
+
     pub fn error(msg: &str) -> Self {
         RedisResponse::Error(msg.to_string())
     }

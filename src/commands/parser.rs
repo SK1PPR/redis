@@ -25,6 +25,9 @@ impl CommandParser {
             "BLPOP" => Self::parse_blpop(&args),
             "BRPOP" => Self::parse_brpop(&args),
             "INCR" => Self::parse_incr(&args),
+            "MULTI" => Self::parse_multi(&args),
+            "EXEC" => Self::parse_exec(&args),
+            "DISCARD" => Self::parse_discard(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -180,5 +183,26 @@ impl CommandParser {
             return Err("Wrong number of arguments for INCR".to_string());
         }
         Ok(RedisCommand::INCR(args[1].clone()))
+    }
+    
+    fn parse_multi(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 1 {
+            return Err("Wrong number of arguments for MULTI".to_string());
+        }
+        Ok(RedisCommand::MULTI)
+    }
+
+    fn parse_exec(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 1 {
+            return Err("Wrong number of arguments for EXEC".to_string());
+        }
+        Ok(RedisCommand::EXEC)
+    }
+
+    fn parse_discard(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 1 {
+            return Err("Wrong number of arguments for DISCARD".to_string());
+        }
+        Ok(RedisCommand::DISCARD)
     }
 }

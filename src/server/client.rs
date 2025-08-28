@@ -1,5 +1,6 @@
 use mio::{net::TcpStream, Token};
 use std::io::{self, Read, Write, ErrorKind};
+use crate::RedisCommand;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ClientState {
@@ -7,6 +8,7 @@ pub enum ClientState {
     Writing,
     Blocked,
     Closed,
+    Multi,
 }
 
 pub struct Client {
@@ -16,6 +18,7 @@ pub struct Client {
     pub write_buffer: Vec<u8>,
     pub write_pos: usize,
     pub state: ClientState,
+    pub execution_queue: Vec<RedisCommand>,
 }
 
 impl Client {
@@ -27,6 +30,7 @@ impl Client {
             write_buffer: Vec::new(),
             write_pos: 0,
             state: ClientState::Reading,
+            execution_queue: Vec::new(),
         }
     }
     
@@ -142,5 +146,18 @@ impl Client {
 
     pub fn is_blocked(&self) -> bool {
         matches!(self.state, ClientState::Blocked)
+    }
+
+    pub fn enter_multi(&mut self) {
+        self.state = ClientState::Multi;
+    }
+
+    pub fn exit_multi(&mut self) {
+        self.state = ClientState::Reading;
+        self.execution_queue.clear();
+    }
+
+    pub fn is_multi(&self) -> bool {
+        matches!(self.state, ClientState::Multi)
     }
 }

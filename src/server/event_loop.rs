@@ -13,7 +13,6 @@ use std::time::{Duration, Instant};
 const SERVER_TOKEN: Token = Token(0);
 const WAKER_TOKEN: Token = Token(usize::MAX);
 
-
 pub struct EventLoop {
     poll: Poll,
     events: Events,
@@ -199,6 +198,15 @@ impl EventLoop {
                 EventLoopMessage::BlockClient { token, timeout } => {
                     self.block_client_internal(token, timeout)?;
                 }
+                EventLoopMessage::StartMulti { token } => {
+                    self.start_multi_internal(token)?;
+                }
+                EventLoopMessage::ExecuteQueue { token } => {
+                    self.exec_queue_internal(token)?;
+                }
+                EventLoopMessage::DiscardQueue { token } => {
+                    self.discard_queue_internal(token)?;
+                }
             }
         }
 
@@ -266,6 +274,29 @@ impl EventLoop {
                 command_args
             );
 
+            let client = self.clients.get_mut(&token).unwrap();
+            if client.is_multi() {
+                // Queue command for later execution
+                match CommandParser::parse(command_args) {
+                    Ok(command) => {
+                        client.execution_queue.push(command);
+                        continue;
+                    }
+                    Err(error) => {
+                        let response = RedisResponse::error(&error);
+                        client.add_response(response.to_resp());
+                        if client.has_pending_writes() {
+                            self.poll.registry().reregister(
+                                &mut client.socket,
+                                token,
+                                Interest::WRITABLE,
+                            )?;
+                        }
+                        continue;
+                    }
+                }
+            }
+
             let response = match CommandParser::parse(command_args) {
                 Ok(command) => {
                     // Execute command with client token for blocking operations
@@ -304,7 +335,11 @@ impl EventLoop {
                 self.blocked_clients_timeout.insert(token, timeout_instant);
             }
 
-            log::debug!("Blocking client {} for {} seconds", token.0, timeout_milliseconds);
+            log::debug!(
+                "Blocking client {} for {} seconds",
+                token.0,
+                timeout_milliseconds
+            );
         }
 
         Ok(())
@@ -326,6 +361,99 @@ impl EventLoop {
                         Interest::WRITABLE,
                     )?;
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn start_multi_internal(&mut self, token: Token) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            if client.is_multi() {
+                let response = RedisResponse::error("MULTI calls can not be nested");
+                client.add_response(response.to_resp());
+
+                if client.has_pending_writes() {
+                    self.poll.registry().reregister(
+                        &mut client.socket,
+                        token,
+                        Interest::WRITABLE,
+                    )?;
+                }
+
+                return Ok(());
+            }
+            client.enter_multi();
+        }
+
+        // Return OK response for MULTI
+        let response = RedisResponse::ok();
+        if let Some(client) = self.clients.get_mut(&token) {
+            client.add_response(response.to_resp());
+
+            if client.has_pending_writes() {
+                self.poll
+                    .registry()
+                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn discard_queue_internal(&mut self, token: Token) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            if !client.is_multi() {
+                let response = RedisResponse::error("DISCARD without MULTI");
+                client.add_response(response.to_resp());
+
+                if client.has_pending_writes() {
+                    self.poll.registry().reregister(
+                        &mut client.socket,
+                        token,
+                        Interest::WRITABLE,
+                    )?;
+                }
+
+                return Ok(());
+            }
+            client.exit_multi();
+        }
+
+        Ok(())
+    }
+
+    fn exec_queue_internal(&mut self, token: Token) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            if !client.is_multi() {
+                let response = RedisResponse::error("EXEC without MULTI");
+                client.add_response(response.to_resp());
+
+                if client.has_pending_writes() {
+                    self.poll.registry().reregister(
+                        &mut client.socket,
+                        token,
+                        Interest::WRITABLE,
+                    )?;
+                }
+
+                return Ok(());
+            }
+
+            let mut responses = Vec::new();
+            for command in client.execution_queue.drain(..) {
+                let response = self.command_executor.execute(command, token);
+                responses.push(response);
+            }
+            client.exit_multi();
+
+            let array_response = RedisResponse::Array(responses);
+            client.add_response(array_response.to_resp());
+
+            if client.has_pending_writes() {
+                self.poll
+                    .registry()
+                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
             }
         }
 

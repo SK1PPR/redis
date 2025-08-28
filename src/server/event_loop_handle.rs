@@ -1,28 +1,44 @@
-use mio::{Token, Waker};
 use crate::RedisResponse;
+use mio::{Token, Waker};
 use std::sync::mpsc::Sender;
 
 #[derive(Debug)]
 pub enum EventLoopMessage {
-    UnblockClient { token: Token, response: RedisResponse },
-    BlockClient { token: Token, timeout: u64 }
+    UnblockClient {
+        token: Token,
+        response: RedisResponse,
+    },
+    BlockClient {
+        token: Token,
+        timeout: u64,
+    },
+    StartMulti {
+        token: Token,
+    },
+    ExecuteQueue {
+        token: Token,
+    },
+    DiscardQueue {
+        token: Token,
+    },
 }
-
 
 #[derive(Debug, Clone)]
 pub struct EventLoopHandle {
     sender: Sender<EventLoopMessage>,
-    waker: std::sync::Arc<Waker>
+    waker: std::sync::Arc<Waker>,
 }
 
 impl EventLoopHandle {
-
     pub fn new(sender: Sender<EventLoopMessage>, waker: std::sync::Arc<Waker>) -> Self {
         EventLoopHandle { sender, waker }
     }
 
     pub fn unblock_client(&self, token: Token, response: RedisResponse) {
-        if let Err(e) = self.sender.send(EventLoopMessage::UnblockClient { token, response }) {
+        if let Err(e) = self
+            .sender
+            .send(EventLoopMessage::UnblockClient { token, response })
+        {
             log::error!("Failed to send UnblockClient message: {}", e);
             return;
         }
@@ -33,8 +49,44 @@ impl EventLoopHandle {
     }
 
     pub fn block_client(&self, token: Token, timeout: u64) {
-        if let Err(e) = self.sender.send(EventLoopMessage::BlockClient { token, timeout }) {
+        if let Err(e) = self
+            .sender
+            .send(EventLoopMessage::BlockClient { token, timeout })
+        {
             log::error!("Failed to send BlockClient message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn execute_queue(&self, token: Token) {
+        if let Err(e) = self.sender.send(EventLoopMessage::ExecuteQueue { token }) {
+            log::error!("Failed to send ExecuteQueue message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn discard_queue(&self, token: Token) {
+        if let Err(e) = self.sender.send(EventLoopMessage::DiscardQueue { token }) {
+            log::error!("Failed to send DiscardQueue message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn start_multi(&self, token: Token) {
+        if let Err(e) = self.sender.send(EventLoopMessage::StartMulti { token }) {
+            log::error!("Failed to send StartMulti message: {}", e);
             return;
         }
 
