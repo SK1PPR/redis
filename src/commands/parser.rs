@@ -9,7 +9,7 @@ impl CommandParser {
         }
 
         let command = args[0].to_uppercase();
-        
+
         match command.as_str() {
             "PING" => Self::parse_ping(&args),
             "ECHO" => Self::parse_echo(&args),
@@ -27,7 +27,7 @@ impl CommandParser {
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
-    
+
     fn parse_ping(args: &[String]) -> Result<RedisCommand, String> {
         match args.len() {
             1 => Ok(RedisCommand::Ping(None)),
@@ -35,48 +35,58 @@ impl CommandParser {
             _ => Err("Wrong number of arguments for PING".to_string()),
         }
     }
-    
+
     fn parse_echo(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() != 2 {
             return Err("Wrong number of arguments for ECHO".to_string());
         }
         Ok(RedisCommand::Echo(args[1].clone()))
     }
-    
+
     fn parse_get(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() != 2 {
             return Err("Wrong number of arguments for GET".to_string());
         }
         Ok(RedisCommand::Get(args[1].clone()))
     }
-    
+
     fn parse_set(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() == 3 {
             Ok(RedisCommand::Set(args[1].clone(), args[2].clone()))
         } else if args.len() == 5 {
             if args[3].to_ascii_uppercase() == "EX" {
-                let expiry: u128 = args[4].parse().map_err(|_| "Invalid expiry value".to_string())?;
-                Ok(RedisCommand::SetWithExpiry(args[1].clone(), args[2].clone(), expiry * 1000)) // Convert seconds to milliseconds
-            }
-            else if args[3].to_ascii_uppercase() == "PX" {
-                let expiry: u128 = args[4].parse().map_err(|_| "Invalid expiry value".to_string())?;
-                Ok(RedisCommand::SetWithExpiry(args[1].clone(), args[2].clone(), expiry))
+                let expiry: u128 = args[4]
+                    .parse()
+                    .map_err(|_| "Invalid expiry value".to_string())?;
+                Ok(RedisCommand::SetWithExpiry(
+                    args[1].clone(),
+                    args[2].clone(),
+                    expiry * 1000,
+                )) // Convert seconds to milliseconds
+            } else if args[3].to_ascii_uppercase() == "PX" {
+                let expiry: u128 = args[4]
+                    .parse()
+                    .map_err(|_| "Invalid expiry value".to_string())?;
+                Ok(RedisCommand::SetWithExpiry(
+                    args[1].clone(),
+                    args[2].clone(),
+                    expiry,
+                ))
             } else {
                 return Err("Invalid SET command format".to_string());
             }
-            
         } else {
             return Err("Wrong number of arguments for SET".to_string());
         }
     }
-    
+
     fn parse_del(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() < 2 {
             return Err("Wrong number of arguments for DEL".to_string());
         }
         Ok(RedisCommand::Del(args[1..].to_vec()))
     }
-    
+
     fn parse_exists(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() < 2 {
             return Err("Wrong number of arguments for EXISTS".to_string());
@@ -95,8 +105,12 @@ impl CommandParser {
         if args.len() != 4 {
             return Err("Wrong number of arguments for LRANGE".to_string());
         }
-        let start: i64 = args[2].parse().map_err(|_| "Invalid start index".to_string())?;
-        let end: i64 = args[3].parse().map_err(|_| "Invalid end index".to_string())?;
+        let start: i64 = args[2]
+            .parse()
+            .map_err(|_| "Invalid start index".to_string())?;
+        let end: i64 = args[3]
+            .parse()
+            .map_err(|_| "Invalid end index".to_string())?;
         Ok(RedisCommand::LRANGE(args[1].clone(), start, end))
     }
 
@@ -119,7 +133,11 @@ impl CommandParser {
             return Err("Wrong number of arguments for LPOP".to_string());
         }
         let count = if args.len() == 3 {
-            Some(args[2].parse::<i64>().map_err(|_| "Invalid count value".to_string())?)
+            Some(
+                args[2]
+                    .parse::<i64>()
+                    .map_err(|_| "Invalid count value".to_string())?,
+            )
         } else {
             None
         };
@@ -130,8 +148,12 @@ impl CommandParser {
         if args.len() < 3 {
             return Err("Wrong number of arguments for BLPOP".to_string());
         }
-        let timeout = args.last().unwrap().parse::<i64>().map_err(|_| "Invalid timeout value".to_string())?;
-        let keys = args[1..args.len()-1].to_vec();
+        let timeout = args
+            .last()
+            .unwrap()
+            .parse::<u32>()
+            .map_err(|_| "Invalid timeout value".to_string())?;
+        let keys = args[1..args.len() - 1].to_vec();
         Ok(RedisCommand::BLPOP(keys, timeout))
     }
 
@@ -139,8 +161,12 @@ impl CommandParser {
         if args.len() < 3 {
             return Err("Wrong number of arguments for BRPOP".to_string());
         }
-        let timeout = args.last().unwrap().parse::<i64>().map_err(|_| "Invalid timeout value".to_string())?;
-        let keys = args[1..args.len()-1].to_vec();
+        let timeout = args
+            .last()
+            .unwrap()
+            .parse::<u32>()
+            .map_err(|_| "Invalid timeout value".to_string())?;
+        let keys = args[1..args.len() - 1].to_vec();
         Ok(RedisCommand::BRPOP(keys, timeout))
     }
 }

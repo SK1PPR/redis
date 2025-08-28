@@ -1,5 +1,6 @@
 pub mod event_loop;
 pub mod client;
+pub mod event_loop_handle;
 
 use event_loop::EventLoop;
 use mio::net::TcpListener;

@@ -1,12 +1,18 @@
 use super::client::Client;
+use super::event_loop_handle::{EventLoopHandle, EventLoopMessage};
 use crate::commands::{CommandExecutor, CommandParser, RedisCommandExecutor};
 use crate::protocol::RespParser;
+use crate::RedisResponse;
 use mio::net::TcpListener;
-use mio::{Events, Interest, Poll, Token};
+use mio::{Events, Interest, Poll, Token, Waker};
 use std::collections::HashMap;
 use std::io;
+use std::sync::mpsc::{self, Receiver};
+use std::time::{Duration, Instant};
 
 const SERVER_TOKEN: Token = Token(0);
+const WAKER_TOKEN: Token = Token(usize::MAX);
+
 
 pub struct EventLoop {
     poll: Poll,
@@ -15,13 +21,27 @@ pub struct EventLoop {
     clients: HashMap<Token, Client>,
     command_executor: RedisCommandExecutor,
     next_token: usize,
+
+    // Communication with other modules
+    #[allow(dead_code)] // Never actually read but given to other modules
+    waker: std::sync::Arc<Waker>,
+
+    message_receiver: Receiver<EventLoopMessage>,
+    event_loop_handle: EventLoopHandle,
+
+    // Blocking operation tracking
+    blocked_clients_timeout: HashMap<Token, Instant>,
 }
 
 impl EventLoop {
     pub fn new(mut server: TcpListener) -> io::Result<Self> {
         let poll = Poll::new()?;
         let events = Events::with_capacity(128);
+        let waker = std::sync::Arc::new(Waker::new(poll.registry(), WAKER_TOKEN)?);
 
+        // Create communication channel
+        let (sender, receiver) = mpsc::channel();
+        let handle = EventLoopHandle::new(sender, std::sync::Arc::clone(&waker));
         // Register server socket for accept events
         poll.registry()
             .register(&mut server, SERVER_TOKEN, Interest::READABLE)?;
@@ -31,17 +51,34 @@ impl EventLoop {
             events,
             server,
             clients: HashMap::new(),
-            command_executor: RedisCommandExecutor::new(),
+            command_executor: RedisCommandExecutor::new(handle.clone()),
             next_token: 1, // 0 is reserved for server
+            waker,
+            message_receiver: receiver,
+            event_loop_handle: handle,
+            blocked_clients_timeout: HashMap::new(),
         })
+    }
+
+    pub fn get_handle(&self) -> EventLoopHandle {
+        self.event_loop_handle.clone()
     }
 
     pub fn run(&mut self) -> io::Result<()> {
         log::info!("Event loop started");
 
         loop {
-            // Block until events are ready
-            self.poll.poll(&mut self.events, None)?;
+            // Calculate timeout for blocked clients
+            let timeout = self.calculate_poll_timeout();
+
+            // Block until events are ready or timeout
+            self.poll.poll(&mut self.events, timeout)?;
+
+            // Check for timed out blocked clients first
+            self.handle_blocked_client_timeouts()?;
+
+            // Process messages from other modules
+            self.process_messages()?;
 
             // Collect events to avoid borrowing conflicts
             let events_to_process: Vec<_> = self
@@ -63,40 +100,11 @@ impl EventLoop {
             {
                 match token {
                     SERVER_TOKEN => {
-                        loop {
-                            match self.server.accept() {
-                                Ok((socket, addr)) => {
-                                    let token = Token(self.next_token);
-                                    self.next_token += 1;
-
-                                    log::info!(
-                                        "New client connection from {} with token {}",
-                                        addr,
-                                        token.0
-                                    );
-
-                                    let mut socket = socket;
-
-                                    // Register new client for read events
-                                    self.poll.registry().register(
-                                        &mut socket,
-                                        token,
-                                        Interest::READABLE,
-                                    )?;
-
-                                    let client = Client::new(socket, token);
-                                    self.clients.insert(token, client);
-                                }
-                                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                                    // No more connections to accept right now
-                                    break;
-                                }
-                                Err(e) => {
-                                    log::error!("Error accepting connection: {}", e);
-                                    return Err(e);
-                                }
-                            }
-                        }
+                        self.handle_new_connections()?;
+                    }
+                    WAKER_TOKEN => {
+                        // Just wake up, no action needed
+                        continue;
                     }
                     token => {
                         if !self.clients.contains_key(&token) {
@@ -147,6 +155,54 @@ impl EventLoop {
             // Clean up closed connections
             self.cleanup_closed_clients()?;
         }
+    }
+
+    fn handle_new_connections(&mut self) -> io::Result<()> {
+        loop {
+            match self.server.accept() {
+                Ok((socket, addr)) => {
+                    let token = Token(self.next_token);
+                    self.next_token += 1;
+
+                    log::info!("New client connection from {} with token {}", addr, token.0);
+
+                    let mut socket = socket;
+
+                    // Register new client for read events
+                    self.poll
+                        .registry()
+                        .register(&mut socket, token, Interest::READABLE)?;
+
+                    let client = Client::new(socket, token);
+                    self.clients.insert(token, client);
+                }
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    // No more connections to accept right now
+                    break;
+                }
+                Err(e) => {
+                    log::error!("Error accepting connection: {}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn process_messages(&mut self) -> io::Result<()> {
+        while let Ok(message) = self.message_receiver.try_recv() {
+            match message {
+                EventLoopMessage::UnblockClient { token, response } => {
+                    self.unblock_client_internal(token, response)?;
+                }
+                EventLoopMessage::BlockClient { token, timeout } => {
+                    self.block_client_internal(token, timeout)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn handle_client_read(&mut self, token: Token) -> io::Result<()> {
@@ -211,19 +267,103 @@ impl EventLoop {
             );
 
             let response = match CommandParser::parse(command_args) {
-                Ok(command) => self.command_executor.execute(command),
+                Ok(command) => {
+                    // Execute command with client token for blocking operations
+                    self.command_executor.execute(command, token)
+                }
                 Err(error) => crate::commands::RedisResponse::error(&error),
             };
 
-            // Add response to client's write buffer
-            let client = self.clients.get_mut(&token).unwrap();
-            client.add_response(response.to_resp());
+            // For blocking commands, the executor will handle the blocking via the handle
+            // We only send responses for non-blocking commands here
+            if !matches!(response, RedisResponse::Blocked) {
+                let client = self.clients.get_mut(&token).unwrap();
+                client.add_response(response.to_resp());
 
-            // Switch to write mode if we have data to send
-            if client.has_pending_writes() {
-                self.poll
-                    .registry()
-                    .reregister(&mut client.socket, token, Interest::WRITABLE)?;
+                // Switch to write mode if we have data to send
+                if client.has_pending_writes() {
+                    self.poll.registry().reregister(
+                        &mut client.socket,
+                        token,
+                        Interest::WRITABLE,
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn block_client_internal(&mut self, token: Token, timeout_secs: u32) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            client.block();
+
+            // Set timeout if specified
+            if timeout_secs > 0 {
+                let timeout_instant = Instant::now() + Duration::from_secs(timeout_secs as u64);
+                self.blocked_clients_timeout.insert(token, timeout_instant);
+            }
+
+            log::debug!("Blocking client {} for {} seconds", token.0, timeout_secs);
+        }
+
+        Ok(())
+    }
+
+    fn unblock_client_internal(&mut self, token: Token, response: RedisResponse) -> io::Result<()> {
+        if let Some(client) = self.clients.get_mut(&token) {
+            if client.is_blocked() {
+                client.unblock();
+                self.blocked_clients_timeout.remove(&token);
+                client.add_response(response.to_resp());
+
+                log::debug!("Unblocking client {}", token.0);
+
+                if client.has_pending_writes() {
+                    self.poll.registry().reregister(
+                        &mut client.socket,
+                        token,
+                        Interest::WRITABLE,
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn calculate_poll_timeout(&self) -> Option<Duration> {
+        if self.blocked_clients_timeout.is_empty() {
+            return None;
+        }
+
+        let now = Instant::now();
+        let next_timeout = self.blocked_clients_timeout.values().min().copied()?;
+
+        if next_timeout <= now {
+            Some(Duration::from_millis(0))
+        } else {
+            Some(next_timeout - now)
+        }
+    }
+
+    fn handle_blocked_client_timeouts(&mut self) -> io::Result<()> {
+        let now = Instant::now();
+        let timed_out_clients: Vec<Token> = self
+            .blocked_clients_timeout
+            .iter()
+            .filter(|(_, &timeout)| timeout <= now)
+            .map(|(&token, _)| token)
+            .collect();
+
+        for token in timed_out_clients {
+            self.blocked_clients_timeout.remove(&token);
+
+            if let Some(client) = self.clients.get_mut(&token) {
+                if client.is_blocked() {
+                    log::debug!("Client {} has timed out", token.0);
+                    self.unblock_client_internal(token, RedisResponse::nil())?;
+                }
             }
         }
 

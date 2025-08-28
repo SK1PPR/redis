@@ -5,8 +5,7 @@ use std::io::{self, Read, Write, ErrorKind};
 pub enum ClientState {
     Reading,
     Writing,
-    BlockedOnBlpop(Vec<String>),
-    BlockedOnBrpop(Vec<String>),
+    Blocked,
     Closed,
 }
 
@@ -133,12 +132,8 @@ impl Client {
         data
     }
 
-    pub fn set_blocked_on_blpop(&mut self, keys: Vec<String>) {
-        self.state = ClientState::BlockedOnBlpop(keys);
-    }
-
-    pub fn set_blocked_on_brpop(&mut self, keys: Vec<String>) {
-        self.state = ClientState::BlockedOnBrpop(keys);
+    pub fn block(&mut self) {
+        self.state = ClientState::Blocked;
     }
 
     pub fn unblock(&mut self) {
@@ -146,13 +141,6 @@ impl Client {
     }
 
     pub fn is_blocked(&self) -> bool {
-        matches!(self.state, ClientState::BlockedOnBlpop(_) | ClientState::BlockedOnBrpop(_))
-    }
-
-    pub fn get_blocked_keys(&self) -> Option<&Vec<String>> {
-        match &self.state {
-            ClientState::BlockedOnBlpop(keys) | ClientState::BlockedOnBrpop(keys) => Some(keys),
-            _ => None,
-        }
+        matches!(self.state, ClientState::Blocked)
     }
 }

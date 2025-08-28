@@ -4,5 +4,5 @@ pub mod server;
 pub mod storage;
 
 pub use commands::{RedisCommand, RedisResponse, CommandExecutor};
-pub use server::RedisServer;
+pub use server::{RedisServer, event_loop_handle::EventLoopHandle};
 pub use protocol::resp::RespParser;
