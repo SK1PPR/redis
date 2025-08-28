@@ -12,7 +12,7 @@ pub trait Storage {
     fn delete_multiple(&mut self, keys: Vec<String>) -> usize;
     fn exists_multiple(&self, keys: &[String]) -> usize;
     fn set_with_expiry(&mut self, key: String, value: String, expiry: u128);
-    fn incr(&mut self, key: String) -> i64;
+    fn incr(&mut self, key: String) -> Option<i64>;
 }
 
 pub trait StorageList {

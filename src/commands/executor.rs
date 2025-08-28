@@ -115,7 +115,10 @@ impl CommandExecutor for RedisCommandExecutor {
                 return RedisResponse::Blocked;
             }
             RedisCommand::INCR(key) => {
-                return RedisResponse::Integer(self.storage.incr(key));
+                match self.storage.incr(key) {
+                    Some(value) => RedisResponse::Integer(value),
+                    None => RedisResponse::error("value is not an integer or out of range"),
+                }
             }
         }
     }

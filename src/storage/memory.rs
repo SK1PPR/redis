@@ -207,19 +207,43 @@ impl Storage for MemoryStorage {
         keys.iter().filter(|key| self.exists(key)).count()
     }
 
-    fn incr(&mut self, key: String) -> i64 {
+    fn incr(&mut self, key: String) -> Option<i64> {
         log::debug!("Incrementing value for key '{}'", key);
-        let current_value = self.get(&key).unwrap_or_else(|| "0".to_string());
-        match current_value.parse::<i64>() {
-            Ok(num) => {
-                let new_value = num + 1;
-                self.set(key, new_value.to_string());
-                new_value
+        if let Some(unit) = self.storage.get_mut(&key) {
+            if unit.implementation.is_string() {
+                if let Some(current_value) = unit.implementation.as_string() {
+                    if unit.is_expired() {
+                        log::debug!("Key '{}' has expired", key);
+                        self.delete(&key);
+                        // Initialize to 1 if expired
+                        let unit = Unit::new_string("1".to_string(), None);
+                        self.storage.insert(key, unit);
+                        return Some(1);
+                    }
+
+                    match current_value.parse::<i64>() {
+                        Ok(num) => {
+                            if let Some(new_value) = num.checked_add(1) {
+                                unit.implementation =
+                                    Unit::new_string(new_value.to_string(), unit.expiry)
+                                        .implementation;
+                                return Some(new_value);
+                            } else {
+                                return None; // Integer overflow occurred
+                            }
+                        }
+                        Err(_) => return None, // Value is not an integer
+                    }
+                }
+                return None;
+            } else {
+                return None; // Value is not a string
             }
-            Err(_) => {
-                log::debug!("Value for key '{}' is not an integer", key);
-                0 // or handle error as needed
-            }
+        } else {
+            // Key does not exist, initialize to 1
+            let unit = Unit::new_string("1".to_string(), None);
+            self.storage.insert(key, unit);
+            return Some(1);
         }
     }
 }
