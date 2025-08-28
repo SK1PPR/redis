@@ -20,6 +20,6 @@ pub trait StorageList {
     fn lpush(&mut self, key: String, value: Vec<String>) -> usize;
     fn llen(&self, key: &str) -> usize;
     fn lpop(&mut self, key: &str, count: usize) -> Option<Vec<String>>;
-    fn blpop(&mut self, keys: Vec<String>, token: mio::Token, timeout: f64) -> Option<Vec<String>>;
-    fn brpop(&mut self, keys: Vec<String>, token: mio::Token, timeout: f64) -> Option<Vec<String>>;
+    fn blpop(&mut self, keys: Vec<String>, token: mio::Token, timeout: u64) -> Option<Vec<String>>;
+    fn brpop(&mut self, keys: Vec<String>, token: mio::Token, timeout: u64) -> Option<Vec<String>>;
 }

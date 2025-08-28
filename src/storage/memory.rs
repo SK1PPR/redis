@@ -357,7 +357,7 @@ impl StorageList for MemoryStorage {
         }
     }
 
-    fn blpop(&mut self, keys: Vec<String>, token: Token, timeout: f64) -> Option<Vec<String>> {
+    fn blpop(&mut self, keys: Vec<String>, token: Token, timeout: u64) -> Option<Vec<String>> {
         log::debug!("BLPOP on keys '{:?}', timeout {}", keys, timeout);
 
         // First, try to get an element immediately from any of the keys
@@ -380,8 +380,8 @@ impl StorageList for MemoryStorage {
         // If none of the lists have elements, block the client
         let blocked_client = BlockedClient {
             token,
-            timeout: if timeout != 0.0 {
-                Some(Instant::now() + Duration::from_secs(timeout as u64))
+            timeout: if timeout != 0 {
+                Some(Instant::now() + Duration::from_millis(timeout as u64))
             } else {
                 None
             },
@@ -401,7 +401,7 @@ impl StorageList for MemoryStorage {
         None
     }
 
-    fn brpop(&mut self, keys: Vec<String>, token: Token, timeout: f64) -> Option<Vec<String>> {
+    fn brpop(&mut self, keys: Vec<String>, token: Token, timeout: u64) -> Option<Vec<String>> {
         log::debug!("BRPOP on keys '{:?}', timeout {}", keys, timeout);
 
         // First, try to get an element immediately from any of the keys
@@ -424,8 +424,8 @@ impl StorageList for MemoryStorage {
         // If none of the lists have elements, block the client
         let blocked_client = BlockedClient {
             token,
-            timeout: if timeout != 0.0 {
-                Some(Instant::now() + Duration::from_secs(timeout as u64))
+            timeout: if timeout != 0 {
+                Some(Instant::now() + Duration::from_millis(timeout as u64))
             } else {
                 None
             },

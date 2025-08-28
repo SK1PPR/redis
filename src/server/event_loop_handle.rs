@@ -5,7 +5,7 @@ use std::sync::mpsc::Sender;
 #[derive(Debug)]
 pub enum EventLoopMessage {
     UnblockClient { token: Token, response: RedisResponse },
-    BlockClient { token: Token, timeout: f64 }
+    BlockClient { token: Token, timeout: u64 }
 }
 
 
@@ -32,7 +32,7 @@ impl EventLoopHandle {
         }
     }
 
-    pub fn block_client(&self, token: Token, timeout: f64) {
+    pub fn block_client(&self, token: Token, timeout: u64) {
         if let Err(e) = self.sender.send(EventLoopMessage::BlockClient { token, timeout }) {
             log::error!("Failed to send BlockClient message: {}", e);
             return;
