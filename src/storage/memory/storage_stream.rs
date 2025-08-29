@@ -1,6 +1,7 @@
-use crate::storage::stream_member::{StreamId, StreamMember, EMPTY_STREAM_ID};
+use std::time::SystemTime;
 
 use super::{MemoryStorage, StorageStream, Unit};
+use crate::storage::stream_member::{StreamId, StreamMember, EMPTY_STREAM_ID};
 
 impl StorageStream for MemoryStorage {
     fn xadd(
@@ -66,7 +67,13 @@ impl StorageStream for MemoryStorage {
 
 fn generate_next_id(last_id: &StreamId, input: &str) -> StreamId {
     if input == "*" {
-        return EMPTY_STREAM_ID; // Placeholder for auto-generated ID
+        return StreamId {
+            timestamp: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            sequence: 0,
+        };
     }
 
     let (first, last) = input.split_once('-').unwrap_or(("0", "0"));
