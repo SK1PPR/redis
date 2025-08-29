@@ -1,13 +1,14 @@
-use std::collections::BTreeSet;
-use super::zset_member::Member;
+use std::collections::{BTreeSet, HashMap};
+use super::zset_member::ZSetMember;
+use super::stream_member::StreamMember;
 
 #[derive(Debug, Clone)]
 pub enum Implementation {
     STRING(String),
     LIST(Vec<String>),
-    STREAM,
+    STREAM(HashMap<String, StreamMember>),
     SET,
-    ZSET(BTreeSet<Member>), // (score, member)
+    ZSET(BTreeSet<ZSetMember>), // (score, member)
     HASH,
 }
 
@@ -21,7 +22,7 @@ impl Implementation {
     }
 
     pub fn is_stream(&self) -> bool {
-        matches!(self, Implementation::STREAM)
+        matches!(self, Implementation::STREAM(_))
     }
 
     pub fn is_set(&self) -> bool {
@@ -76,7 +77,7 @@ impl Implementation {
         }
     }
 
-    pub fn as_zset(&self) -> Option<&BTreeSet<Member>> {
+    pub fn as_zset(&self) -> Option<&BTreeSet<ZSetMember>> {
         if let Implementation::ZSET(ref z) = self {
             Some(z)
         } else {
@@ -84,9 +85,25 @@ impl Implementation {
         }
     }
 
-    pub fn as_zset_mut(&mut self) -> Option<&mut BTreeSet<Member>> {
+    pub fn as_zset_mut(&mut self) -> Option<&mut BTreeSet<ZSetMember>> {
         if let Implementation::ZSET(ref mut z) = self {
             Some(z)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_stream(&self) -> Option<&HashMap<String, StreamMember>> {
+        if let Implementation::STREAM(ref s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_stream_mut(&mut self) -> Option<&mut HashMap<String, StreamMember>> {
+        if let Implementation::STREAM(ref mut s) = self {
+            Some(s)
         } else {
             None
         }
@@ -114,9 +131,16 @@ impl Unit {
         }
     }
 
-    pub fn new_zset(value: BTreeSet<Member>, expiry: Option<u128>) -> Self {
+    pub fn new_zset(value: BTreeSet<ZSetMember>, expiry: Option<u128>) -> Self {
         Unit {
             implementation: Implementation::ZSET(value),
+            expiry,
+        }
+    }
+
+    pub fn new_stream(expiry: Option<u128>) -> Self {
+        Unit {
+            implementation: Implementation::STREAM(HashMap::new()),
             expiry,
         }
     }

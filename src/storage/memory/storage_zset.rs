@@ -1,4 +1,4 @@
-use crate::storage::zset_member::Member;
+use crate::storage::zset_member::ZSetMember;
 
 use super::{MemoryStorage, Storage, StorageZSet, Unit};
 
@@ -17,7 +17,7 @@ impl StorageZSet for MemoryStorage {
                     log::debug!("Key '{}' has expired or is not a sorted set", key);
                     self.delete(&key);
                     let mut new_set = std::collections::BTreeSet::new();
-                    new_set.insert(Member { score, member });
+                    new_set.insert(ZSetMember { score, member });
                     let new_unit = Unit::new_zset(new_set, None);
                     self.storage.insert(key, new_unit);
                     return 1;
@@ -25,12 +25,12 @@ impl StorageZSet for MemoryStorage {
                 if let Some(zset) = u.implementation.as_zset_mut() {
                     // Check if member already exists
                     if zset.iter().any(|m| m.member == member) {
-                        // Member exists, update score
+                        // ZSetMember exists, update score
                         zset.retain(|m| m.member != member); // Remove old entry
-                        zset.insert(Member { score, member }); // Insert updated entry
+                        zset.insert(ZSetMember { score, member }); // Insert updated entry
                         return 0;
                     } else {
-                        zset.insert(Member { score, member });
+                        zset.insert(ZSetMember { score, member });
                         return 1;
                     }
                 }
@@ -38,7 +38,7 @@ impl StorageZSet for MemoryStorage {
             }
             None => {
                 let mut new_set = std::collections::BTreeSet::new();
-                new_set.insert(Member { score, member });
+                new_set.insert(ZSetMember { score, member });
                 let new_unit = Unit::new_zset(new_set, None);
                 self.storage.insert(key, new_unit);
                 1

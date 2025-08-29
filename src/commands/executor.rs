@@ -1,6 +1,6 @@
 use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
-use crate::storage::{MemoryStorage, Storage, StorageList, StorageZSet};
+use crate::storage::{MemoryStorage, Storage, StorageList, StorageZSet, StorageStream};
 use mio::Token;
 
 pub trait CommandExecutor {
@@ -198,6 +198,10 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
             }
             RedisCommand::TYPE(key) => RedisResponse::SimpleString(self.storage.get_type(&key)),
+            RedisCommand::XADD(key, id, fields) => {
+                let entry_id = self.storage.xadd(key, id.unwrap(), fields);
+                RedisResponse::BulkString(Some(entry_id))
+            }
         }
     }
 }

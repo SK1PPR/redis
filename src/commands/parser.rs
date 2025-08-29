@@ -35,6 +35,7 @@ impl CommandParser {
             "ZSCORE" => Self::parse_zscore(&args),
             "ZREM" => Self::parse_zrem(&args),
             "TYPE" => Self::parse_type(&args),
+            "XADD" => Self::parse_xadd(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -270,5 +271,18 @@ impl CommandParser {
             return Err("Wrong number of arguments for TYPE".to_string());
         }
         Ok(RedisCommand::TYPE(args[1].clone()))
+    }
+
+    fn parse_xadd(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 4 || args.len() % 2 == 0 {
+            return Err("Wrong number of arguments for XADD".to_string());
+        }
+        let key = args[1].clone();
+        let id = args[2].clone();
+        let mut fields = Vec::new();
+        for i in (3..args.len()).step_by(2) {
+            fields.push((args[i].clone(), args[i + 1].clone()));
+        }
+        Ok(RedisCommand::XADD(key, Some(id), fields))
     }
 }

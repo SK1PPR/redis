@@ -4,10 +4,11 @@ use std::time::Instant;
 
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
-use crate::storage::{Storage, StorageList, StorageZSet, Unit};
+use crate::storage::{Storage, StorageList, StorageStream, StorageZSet, Unit};
 
 mod storage;
 mod storage_list;
+mod storage_stream;
 mod storage_zset;
 
 #[derive(Debug, Clone)]
@@ -166,6 +167,8 @@ impl MemoryStorage {
                 "list".to_string()
             } else if unit.implementation.is_zset() {
                 "zset".to_string()
+            } else if unit.implementation.is_stream() {
+                "stream".to_string()
             } else {
                 "unknown".to_string()
             }

@@ -1,6 +1,7 @@
 pub mod memory;
 pub mod unit;
 mod zset_member;
+mod stream_member;
 
 pub use memory::MemoryStorage;
 pub use unit::Unit;
@@ -33,4 +34,8 @@ pub trait StorageZSet {
     fn zcard(&self, key: &str) -> usize;
     fn zscore(&self, key: &str, member: &str) -> Option<f64>;
     fn zrem(&mut self, key: &str, member: &str) -> bool;
+}
+
+pub trait StorageStream {
+    fn xadd(&mut self, key: String, id: String, fields: Vec<(String, String)>) -> String;
 }
