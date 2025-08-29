@@ -30,6 +30,10 @@ impl CommandParser {
             "DISCARD" => Self::parse_discard(&args),
             "ZADD" => Self::parse_zadd(&args),
             "ZRANK" => Self::parse_zrank(&args),
+            "ZRANGE" => Self::parse_zrange(&args),
+            "ZCARD" => Self::parse_zcard(&args),
+            "ZSCORE" => Self::parse_zscore(&args),
+            "ZREM" => Self::parse_zrem(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -224,5 +228,39 @@ impl CommandParser {
             return Err("Wrong number of arguments for ZRANK".to_string());
         }
         Ok(RedisCommand::ZRANK(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_zrange(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 4 {
+            return Err("Wrong number of arguments for ZRANGE".to_string());
+        }
+        let start = args[2]
+            .parse::<i64>()
+            .map_err(|_| "Invalid start index".to_string())?;
+        let end = args[3]
+            .parse::<i64>()
+            .map_err(|_| "Invalid end index".to_string())?;
+        Ok(RedisCommand::ZRANGE(args[1].clone(), start, end))
+    }
+
+    fn parse_zcard(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for ZCARD".to_string());
+        }
+        Ok(RedisCommand::ZCARD(args[1].clone()))
+    }
+
+    fn parse_zscore(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for ZSCORE".to_string());
+        }
+        Ok(RedisCommand::ZSCORE(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_zrem(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for ZREM".to_string());
+        }
+        Ok(RedisCommand::ZREM(args[1].clone(), args[2].clone()))
     }
 }

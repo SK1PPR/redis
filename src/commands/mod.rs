@@ -28,4 +28,8 @@ pub enum RedisCommand {
     DISCARD,
     ZADD(String, f64, String),
     ZRANK(String, String),
+    ZRANGE(String, i64, i64),
+    ZCARD(String),
+    ZSCORE(String, String),
+    ZREM(String, String)
 }

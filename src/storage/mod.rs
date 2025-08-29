@@ -29,8 +29,8 @@ pub trait StorageList {
 pub trait StorageZSet {
     fn zadd(&mut self, key: String, score: f64, member: String) -> usize;
     fn zrank(&self, key: &str, member: &str) -> Option<usize>;
-    // fn zrange(&self, key: &str, start: i64, end: i64) -> Option<Vec<String>>;
-    // fn zcard(&self, key: &str) -> usize;
-    // fn zscore(&self, key: &str, member: &str) -> Option<f64>;
-    // fn zrem(&mut self, key: &str, member: &str) -> bool;
+    fn zrange(&self, key: &str, start: i64, end: i64) -> Option<Vec<String>>;
+    fn zcard(&self, key: &str) -> usize;
+    fn zscore(&self, key: &str, member: &str) -> Option<f64>;
+    fn zrem(&mut self, key: &str, member: &str) -> bool;
 }

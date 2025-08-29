@@ -166,6 +166,37 @@ impl CommandExecutor for RedisCommandExecutor {
                 Some(rank) => RedisResponse::Integer(rank as i64),
                 None => RedisResponse::nil(),
             },
+            RedisCommand::ZRANGE(key, start, end) => match self.storage.zrange(&key, start, end) {
+                Some(members) => {
+                    if members.is_empty() {
+                        RedisResponse::Array(vec![])
+                    } else {
+                        RedisResponse::Array(
+                            members
+                                .into_iter()
+                                .map(|member| RedisResponse::SimpleString(member))
+                                .collect(),
+                        )
+                    }
+                }
+                None => RedisResponse::Array(vec![]),
+            },
+            RedisCommand::ZCARD(key) => {
+                let count = self.storage.zcard(&key);
+                RedisResponse::Integer(count as i64)
+            }
+            RedisCommand::ZSCORE(key, member) => match self.storage.zscore(&key, &member) {
+                Some(score) => RedisResponse::BulkString(Some(score.to_string())),
+                None => RedisResponse::nil(),
+            },
+            RedisCommand::ZREM(key, member) => {
+                let removed = self.storage.zrem(&key, &member);
+                if removed {
+                    RedisResponse::Integer(1)
+                } else {
+                    RedisResponse::Integer(0)
+                }
+            }
         }
     }
 }
