@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
-use crate::storage::{Storage, StorageList, Unit, StorageZSet};
+use crate::storage::{Storage, StorageList, StorageZSet, Unit};
 
 mod storage;
 mod storage_list;
@@ -151,6 +151,26 @@ impl MemoryStorage {
                 self.blocked_clients.get(key).map_or(0, |v| v.len()),
                 key
             );
+        }
+    }
+
+    pub fn get_type(&self, key: &str) -> String {
+        if let Some(unit) = self.storage.get(key) {
+            if unit.is_expired() {
+                log::debug!("Key '{}' has expired", key);
+                return "none".to_string();
+            }
+            if unit.implementation.is_string() {
+                "string".to_string()
+            } else if unit.implementation.is_list() {
+                "list".to_string()
+            } else if unit.implementation.is_zset() {
+                "zset".to_string()
+            } else {
+                "unknown".to_string()
+            }
+        } else {
+            "none".to_string()
         }
     }
 }

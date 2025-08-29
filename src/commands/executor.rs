@@ -197,6 +197,7 @@ impl CommandExecutor for RedisCommandExecutor {
                     RedisResponse::Integer(0)
                 }
             }
+            RedisCommand::TYPE(key) => RedisResponse::SimpleString(self.storage.get_type(&key)),
         }
     }
 }

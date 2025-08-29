@@ -34,6 +34,7 @@ impl CommandParser {
             "ZCARD" => Self::parse_zcard(&args),
             "ZSCORE" => Self::parse_zscore(&args),
             "ZREM" => Self::parse_zrem(&args),
+            "TYPE" => Self::parse_type(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -262,5 +263,12 @@ impl CommandParser {
             return Err("Wrong number of arguments for ZREM".to_string());
         }
         Ok(RedisCommand::ZREM(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_type(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for TYPE".to_string());
+        }
+        Ok(RedisCommand::TYPE(args[1].clone()))
     }
 }

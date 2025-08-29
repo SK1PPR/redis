@@ -31,5 +31,6 @@ pub enum RedisCommand {
     ZRANGE(String, i64, i64),
     ZCARD(String),
     ZSCORE(String, String),
-    ZREM(String, String)
+    ZREM(String, String),
+    TYPE(String)
 }
