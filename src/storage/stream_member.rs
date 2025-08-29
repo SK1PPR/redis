@@ -6,8 +6,8 @@ pub struct StreamMember {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct StreamId {
-    pub sequence: u64,
     pub timestamp: u64,
+    pub sequence: u64,
 }
 
 impl StreamId {
@@ -19,8 +19,8 @@ impl StreamId {
                 timestamp: 0,
             };
         }
-        let sequence = parts[0].parse::<u64>().unwrap_or(0);
-        let timestamp = parts[1].parse::<u64>().unwrap_or(0);
+        let timestamp = parts[0].parse::<u64>().unwrap_or(0);
+        let sequence = parts[1].parse::<u64>().unwrap_or(0);
         StreamId {
             timestamp,
             sequence,
@@ -32,7 +32,7 @@ impl StreamId {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{}-{}", self.sequence, self.timestamp)
+        format!("{}-{}", self.timestamp, self.sequence)
     }
 }
 

@@ -23,7 +23,7 @@ impl StorageStream for MemoryStorage {
                     } else {
                         EMPTY_STREAM_ID.clone()
                     };
-                    let entry_id = StreamId::new(&id);
+                    let entry_id = generate_next_id(&top_id, &id);
                     if entry_id <= top_id {
                         log::debug!(
                             "Provided ID '{}' is not greater than the last ID '{}'",
@@ -31,7 +31,9 @@ impl StorageStream for MemoryStorage {
                             top_id.to_string()
                         );
                         if entry_id == EMPTY_STREAM_ID {
-                            return Err("The ID specified in XADD must be greater than 0-0".to_string());
+                            return Err(
+                                "The ID specified in XADD must be greater than 0-0".to_string()
+                            );
                         }
                         return Err("The ID specified in XADD is equal or smaller than the target stream top item".to_string());
                     }
@@ -46,7 +48,7 @@ impl StorageStream for MemoryStorage {
             }
             None => {
                 let mut new_stream = Vec::new();
-                let entry_id = StreamId::new(&id);
+                let entry_id = generate_next_id(&EMPTY_STREAM_ID, &id);
                 if entry_id <= EMPTY_STREAM_ID {
                     log::debug!("Invalid stream ID '{}'", id);
                     return Err("The ID specified in XADD must be greater than 0-0".to_string());
@@ -59,5 +61,37 @@ impl StorageStream for MemoryStorage {
                 Ok(entry_id.to_string())
             }
         }
+    }
+}
+
+fn generate_next_id(last_id: &StreamId, input: &str) -> StreamId {
+    if input == "*" {
+        return EMPTY_STREAM_ID; // Placeholder for auto-generated ID
+    }
+
+    let (first, last) = input.split_once('-').unwrap_or(("0", "0"));
+
+    if last == "*" {
+        let first = first.parse::<u64>().unwrap_or(0);
+        return StreamId {
+            timestamp: first,
+            sequence: if first == last_id.timestamp {
+                last_id.sequence + 1
+            } else {
+                0
+            },
+        };
+    }
+
+    if first == "*" {
+        return StreamId {
+            timestamp: last_id.timestamp + 1,
+            sequence: 0,
+        };
+    }
+
+    StreamId {
+        timestamp: first.parse().unwrap_or(0),
+        sequence: last.parse().unwrap_or(0),
     }
 }
