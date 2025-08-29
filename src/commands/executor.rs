@@ -1,6 +1,6 @@
 use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
-use crate::storage::{MemoryStorage, Storage, StorageList};
+use crate::storage::{MemoryStorage, Storage, StorageList, StorageZSet};
 use mio::Token;
 
 pub trait CommandExecutor {
@@ -145,7 +145,7 @@ impl CommandExecutor for RedisCommandExecutor {
             RedisCommand::INCR(key) => match self.storage.incr(key) {
                 Some(value) => RedisResponse::Integer(value),
                 None => RedisResponse::error("value is not an integer or out of range"),
-            }
+            },
             RedisCommand::MULTI => {
                 self.start_transaction(token);
                 RedisResponse::Empty
@@ -158,6 +158,14 @@ impl CommandExecutor for RedisCommandExecutor {
                 self.discard_transaction(token);
                 RedisResponse::Empty
             }
+            RedisCommand::ZADD(key, score, member) => {
+                let added = self.storage.zadd(key, score, member);
+                RedisResponse::Integer(added as i64)
+            }
+            RedisCommand::ZRANK(key, member) => match self.storage.zrank(&key, &member) {
+                Some(rank) => RedisResponse::Integer(rank as i64),
+                None => RedisResponse::nil(),
+            },
         }
     }
 }

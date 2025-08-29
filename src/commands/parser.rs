@@ -28,6 +28,8 @@ impl CommandParser {
             "MULTI" => Self::parse_multi(&args),
             "EXEC" => Self::parse_exec(&args),
             "DISCARD" => Self::parse_discard(&args),
+            "ZADD" => Self::parse_zadd(&args),
+            "ZRANK" => Self::parse_zrank(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -184,7 +186,7 @@ impl CommandParser {
         }
         Ok(RedisCommand::INCR(args[1].clone()))
     }
-    
+
     fn parse_multi(args: &[String]) -> Result<RedisCommand, String> {
         if args.len() != 1 {
             return Err("Wrong number of arguments for MULTI".to_string());
@@ -204,5 +206,23 @@ impl CommandParser {
             return Err("Wrong number of arguments for DISCARD".to_string());
         }
         Ok(RedisCommand::DISCARD)
+    }
+
+    fn parse_zadd(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 4 {
+            return Err("Wrong number of arguments for ZADD".to_string());
+        }
+        let score = args[2]
+            .parse::<f64>()
+            .map_err(|_| "Invalid score value".to_string())?;
+        let member = args[3].clone();
+        Ok(RedisCommand::ZADD(args[1].clone(), score, member))
+    }
+
+    fn parse_zrank(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for ZRANK".to_string());
+        }
+        Ok(RedisCommand::ZRANK(args[1].clone(), args[2].clone()))
     }
 }

@@ -1,11 +1,14 @@
+use std::collections::BTreeSet;
+use super::zset_member::Member;
+
 #[derive(Debug, Clone)]
 pub enum Implementation {
     STRING(String),
     LIST(Vec<String>),
     STREAM,
     SET,
-    ZSET,
-    HASH
+    ZSET(BTreeSet<Member>), // (score, member)
+    HASH,
 }
 
 impl Implementation {
@@ -26,7 +29,7 @@ impl Implementation {
     }
 
     pub fn is_zset(&self) -> bool {
-        matches!(self, Implementation::ZSET)
+        matches!(self, Implementation::ZSET(_))
     }
 
     pub fn is_hash(&self) -> bool {
@@ -72,12 +75,28 @@ impl Implementation {
             panic!("Cannot get length of non-list implementation");
         }
     }
+
+    pub fn as_zset(&self) -> Option<&BTreeSet<Member>> {
+        if let Implementation::ZSET(ref z) = self {
+            Some(z)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_zset_mut(&mut self) -> Option<&mut BTreeSet<Member>> {
+        if let Implementation::ZSET(ref mut z) = self {
+            Some(z)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Unit {
     pub implementation: Implementation,
-    pub expiry: Option<u128>
+    pub expiry: Option<u128>,
 }
 
 impl Unit {
@@ -95,12 +114,21 @@ impl Unit {
         }
     }
 
+    pub fn new_zset(value: BTreeSet<Member>, expiry: Option<u128>) -> Self {
+        Unit {
+            implementation: Implementation::ZSET(value),
+            expiry,
+        }
+    }
+
     pub fn is_expired(&self) -> bool {
         if let Some(expiry) = self.expiry {
-            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis();
             return now > expiry;
         }
         false
     }
 }
-

@@ -26,4 +26,6 @@ pub enum RedisCommand {
     MULTI,
     EXEC,
     DISCARD,
+    ZADD(String, f64, String),
+    ZRANK(String, String),
 }
