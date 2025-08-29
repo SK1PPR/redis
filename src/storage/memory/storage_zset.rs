@@ -23,9 +23,16 @@ impl StorageZSet for MemoryStorage {
                     return 1;
                 }
                 if let Some(zset) = u.implementation.as_zset_mut() {
-                    let initial_len = zset.len();
-                    zset.replace(Member { score, member });
-                    return if zset.len() > initial_len { 1 } else { 0 };
+                    // Check if member already exists
+                    if zset.iter().any(|m| m.member == member) {
+                        // Member exists, update score
+                        zset.retain(|m| m.member != member); // Remove old entry
+                        zset.insert(Member { score, member }); // Insert updated entry
+                        return 0;
+                    } else {
+                        zset.insert(Member { score, member });
+                        return 1;
+                    }
                 }
                 0
             }
