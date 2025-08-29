@@ -37,5 +37,5 @@ pub trait StorageZSet {
 }
 
 pub trait StorageStream {
-    fn xadd(&mut self, key: String, id: String, fields: Vec<(String, String)>) -> Option<String>;
+    fn xadd(&mut self, key: String, id: String, fields: Vec<(String, String)>) -> Result<String, String>;
 }

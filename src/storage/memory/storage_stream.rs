@@ -3,14 +3,19 @@ use crate::storage::stream_member::{StreamId, StreamMember, EMPTY_STREAM_ID};
 use super::{MemoryStorage, StorageStream, Unit};
 
 impl StorageStream for MemoryStorage {
-    fn xadd(&mut self, key: String, id: String, fields: Vec<(String, String)>) -> Option<String> {
+    fn xadd(
+        &mut self,
+        key: String,
+        id: String,
+        fields: Vec<(String, String)>,
+    ) -> Result<String, String> {
         log::debug!("XADD called for key '{}'", key);
         let unit = self.storage.get_mut(&key);
         match unit {
             Some(u) => {
                 if u.is_expired() || !u.implementation.is_stream() {
                     log::debug!("Key '{}' has expired or is not a stream", key);
-                    return None;
+                    return Err("Key does not exist or is not a stream".to_string());
                 }
                 if let Some(stream) = u.implementation.as_stream_mut() {
                     let top_id = if let Some(last) = stream.last() {
@@ -25,15 +30,18 @@ impl StorageStream for MemoryStorage {
                             id,
                             top_id.to_string()
                         );
-                        return None;
+                        if entry_id == EMPTY_STREAM_ID {
+                            return Err("The ID specified in XADD must be greater than 0-0".to_string());
+                        }
+                        return Err("The ID specified in XADD is equal or smaller than the target stream top item".to_string());
                     }
                     stream.push(StreamMember {
                         id: entry_id.clone(),
                         fields,
                     });
-                    Some(entry_id.to_string())
+                    Ok(entry_id.to_string())
                 } else {
-                    return None;
+                    return Err("Key does not exist or is not a stream".to_string());
                 }
             }
             None => {
@@ -41,14 +49,14 @@ impl StorageStream for MemoryStorage {
                 let entry_id = StreamId::new(&id);
                 if entry_id <= EMPTY_STREAM_ID {
                     log::debug!("Invalid stream ID '{}'", id);
-                    return None;
+                    return Err("The ID specified in XADD must be greater than 0-0".to_string());
                 }
                 new_stream.push(StreamMember {
                     id: entry_id.clone(),
                     fields,
                 });
                 self.storage.insert(key, Unit::new_stream(None));
-                Some(entry_id.to_string())
+                Ok(entry_id.to_string())
             }
         }
     }

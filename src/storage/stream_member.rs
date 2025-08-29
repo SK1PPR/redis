@@ -15,12 +15,12 @@ impl StreamId {
         let parts: Vec<&str> = id.split('-').collect();
         if parts.len() != 2 {
             return StreamId {
-                timestamp: 0,
                 sequence: 0,
+                timestamp: 0,
             };
         }
-        let timestamp = parts[0].parse::<u64>().unwrap_or(0);
-        let sequence = parts[1].parse::<u64>().unwrap_or(0);
+        let sequence = parts[0].parse::<u64>().unwrap_or(0);
+        let timestamp = parts[1].parse::<u64>().unwrap_or(0);
         StreamId {
             timestamp,
             sequence,
@@ -32,7 +32,7 @@ impl StreamId {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{}-{}", self.timestamp, self.sequence)
+        format!("{}-{}", self.sequence, self.timestamp)
     }
 }
 
