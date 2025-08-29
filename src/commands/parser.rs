@@ -36,6 +36,7 @@ impl CommandParser {
             "ZREM" => Self::parse_zrem(&args),
             "TYPE" => Self::parse_type(&args),
             "XADD" => Self::parse_xadd(&args),
+            "XRANGE" => Self::parse_xrange(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -284,5 +285,15 @@ impl CommandParser {
             fields.push((args[i].clone(), args[i + 1].clone()));
         }
         Ok(RedisCommand::XADD(key, Some(id), fields))
+    }
+
+    fn parse_xrange(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 4 {
+            return Err("Wrong number of arguments for XRANGE".to_string());
+        }
+        let key = args[1].clone();
+        let start = args[2].clone();
+        let end = args[3].clone();
+        Ok(RedisCommand::XRANGE(key, start, end))
     }
 }

@@ -33,5 +33,6 @@ pub enum RedisCommand {
     ZSCORE(String, String),
     ZREM(String, String),
     TYPE(String),
-    XADD(String, Option<String>, Vec<(String, String)>)
+    XADD(String, Option<String>, Vec<(String, String)>),
+    XRANGE(String, String, String),
 }

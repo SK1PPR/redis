@@ -58,10 +58,35 @@ impl StorageStream for MemoryStorage {
                     id: entry_id.clone(),
                     fields,
                 });
-                self.storage.insert(key, Unit::new_stream(None));
+                self.storage.insert(key, Unit::new_stream(new_stream, None));
                 Ok(entry_id.to_string())
             }
         }
+    }
+
+    fn xrange(
+        &self,
+        key: &str,
+        start: String,
+        end: String,
+    ) -> Option<Vec<(String, Vec<(String, String)>)>> {
+        log::debug!("XRANGE called for key '{}'", key);
+        let unit = self.storage.get(key)?;
+        if unit.is_expired() || !unit.implementation.is_stream() {
+            log::debug!("Key '{}' has expired or is not a stream", key);
+            return None;
+        }
+        let stream = unit.implementation.as_stream()?;
+        let start_id = generate_query_id(&start);
+        let end_id = generate_query_id(&end);
+
+        let mut result = Vec::new();
+        for member in stream {
+            if member.id >= start_id && member.id <= end_id {
+                result.push((member.id.to_string(), member.fields.clone()));
+            }
+        }
+        Some(result)
     }
 }
 
@@ -90,12 +115,30 @@ fn generate_next_id(last_id: &StreamId, input: &str) -> StreamId {
         };
     }
 
-    if first == "*" {
+    StreamId {
+        timestamp: first.parse().unwrap_or(0),
+        sequence: last.parse().unwrap_or(0),
+    }
+}
+
+fn generate_query_id(input: &str) -> StreamId {
+    if input == "-" || input == "+" {
         return StreamId {
-            timestamp: last_id.timestamp + 1,
+            timestamp: if input == "-" { 0 } else { u64::MAX },
+            sequence: if input == "-" { 0 } else { u64::MAX },
+        };
+    }
+
+    if !input.contains("-") {
+        // Only timestamp provided
+        let timestamp = input.parse::<u64>().unwrap_or(0);
+        return StreamId {
+            timestamp,
             sequence: 0,
         };
     }
+
+    let (first, last) = input.split_once('-').unwrap_or(("0", "0"));
 
     StreamId {
         timestamp: first.parse().unwrap_or(0),

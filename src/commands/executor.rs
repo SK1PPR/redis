@@ -207,6 +207,31 @@ impl CommandExecutor for RedisCommandExecutor {
                     }
                 }
             }
+            RedisCommand::XRANGE(key, start, end) => match self.storage.xrange(&key, start, end) {
+                Some(entries) => {
+                    if entries.is_empty() {
+                        RedisResponse::Array(vec![])
+                    } else {
+                        RedisResponse::Array(
+                            entries
+                                .into_iter()
+                                .map(|(id, fields)| {
+                                    let mut field_array = Vec::new();
+                                    for (field, value) in fields {
+                                        field_array.push(RedisResponse::BulkString(Some(field)));
+                                        field_array.push(RedisResponse::BulkString(Some(value)));
+                                    }
+                                    RedisResponse::Array(vec![
+                                        RedisResponse::BulkString(Some(id)),
+                                        RedisResponse::Array(field_array),
+                                    ])
+                                })
+                                .collect(),
+                        )
+                    }
+                }
+                None => RedisResponse::Array(vec![]),
+            },
         }
     }
 }

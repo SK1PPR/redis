@@ -138,9 +138,9 @@ impl Unit {
         }
     }
 
-    pub fn new_stream(expiry: Option<u128>) -> Self {
+    pub fn new_stream(value: Vec<StreamMember>, expiry: Option<u128>) -> Self {
         Unit {
-            implementation: Implementation::STREAM(Vec::new()),
+            implementation: Implementation::STREAM(value),
             expiry,
         }
     }
