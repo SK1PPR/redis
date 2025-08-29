@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use super::zset_member::ZSetMember;
 use super::stream_member::StreamMember;
 
@@ -6,7 +6,7 @@ use super::stream_member::StreamMember;
 pub enum Implementation {
     STRING(String),
     LIST(Vec<String>),
-    STREAM(HashMap<String, StreamMember>),
+    STREAM(Vec<StreamMember>),
     SET,
     ZSET(BTreeSet<ZSetMember>), // (score, member)
     HASH,
@@ -93,7 +93,7 @@ impl Implementation {
         }
     }
 
-    pub fn as_stream(&self) -> Option<&HashMap<String, StreamMember>> {
+    pub fn as_stream(&self) -> Option<&Vec<StreamMember>> {
         if let Implementation::STREAM(ref s) = self {
             Some(s)
         } else {
@@ -101,7 +101,7 @@ impl Implementation {
         }
     }
 
-    pub fn as_stream_mut(&mut self) -> Option<&mut HashMap<String, StreamMember>> {
+    pub fn as_stream_mut(&mut self) -> Option<&mut Vec<StreamMember>> {
         if let Implementation::STREAM(ref mut s) = self {
             Some(s)
         } else {
@@ -140,7 +140,7 @@ impl Unit {
 
     pub fn new_stream(expiry: Option<u128>) -> Self {
         Unit {
-            implementation: Implementation::STREAM(HashMap::new()),
+            implementation: Implementation::STREAM(Vec::new()),
             expiry,
         }
     }

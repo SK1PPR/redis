@@ -200,7 +200,7 @@ impl CommandExecutor for RedisCommandExecutor {
             RedisCommand::TYPE(key) => RedisResponse::SimpleString(self.storage.get_type(&key)),
             RedisCommand::XADD(key, id, fields) => {
                 let entry_id = self.storage.xadd(key, id.unwrap(), fields);
-                RedisResponse::BulkString(Some(entry_id))
+                RedisResponse::BulkString(entry_id)
             }
         }
     }
