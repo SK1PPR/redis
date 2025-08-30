@@ -39,6 +39,7 @@ impl CommandParser {
             "XRANGE" => Self::parse_xrange(&args),
             "XREAD" => Self::parse_xread(&args),
             "GEOADD" => Self::parse_geoadd(&args),
+            "GEOPOS" => Self::parse_geopos(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -361,5 +362,12 @@ impl CommandParser {
             latitude,
             member,
         ))
+    }
+
+    fn parse_geopos(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for GEOPOS".to_string());
+        }
+        Ok(RedisCommand::GEOPOS(args[1].clone(), args[2].clone()))
     }
 }

@@ -59,6 +59,31 @@ impl StorageGeo for MemoryStorage {
             }
         }
     }
+
+    fn geopos(&self, key: &str, member: &str) -> Option<(f64, f64)> {
+        log::debug!(
+            "Retrieving position of member '{}' from geo set '{}'",
+            member,
+            key
+        );
+        let unit = self.storage.get(key);
+        match unit {
+            Some(u) => {
+                if u.is_expired() || !u.implementation.is_zset() {
+                    log::debug!("Key '{}' has expired or is not a geo set", key);
+                    return None;
+                }
+                if let Some(zset) = u.implementation.as_zset() {
+                    if let Some(zset_member) = zset.iter().find(|m| m.member == member) {
+                        let (longitude, latitude) = GeoUtils::decode_score(zset_member.score);
+                        return Some((longitude, latitude));
+                    }
+                }
+                None
+            }
+            None => None,
+        }
+    }
 }
 
 struct GeoUtils;
@@ -102,6 +127,16 @@ impl GeoUtils {
         x
     }
 
+    fn compact_bits(value: u64) -> u32 {
+        let mut x = value & 0x5555555555555555;
+        x = (x | (x >> 1)) & 0x3333333333333333;
+        x = (x | (x >> 2)) & 0x0F0F0F0F0F0F0F0F;
+        x = (x | (x >> 4)) & 0x00FF00FF00FF00FF;
+        x = (x | (x >> 8)) & 0x0000FFFF0000FFFF;
+        x = (x | (x >> 16)) & 0x00000000FFFFFFFF;
+        x as u32
+    }
+
     fn interleave_bits(x: u32, y: u32) -> u64 {
         Self::spread_bits(x) | (Self::spread_bits(y) << 1)
     }
@@ -116,5 +151,74 @@ impl GeoUtils {
 
     pub fn validate_location(longitude: f64, latitude: f64) -> bool {
         Self::validate_longitude(longitude) && Self::validate_latitude(latitude)
+    }
+
+    pub fn decode_score(score: f64) -> (f64, f64) {
+        let score = score as u64;
+        let lat = Self::compact_bits(score);
+        let lon = Self::compact_bits(score >> 1);
+
+        let grid_latitude_range = (
+            Self::MIN_LATITUDE + Self::LATITUDE_RANGE * (lat as f64) / ((1 << 26) as f64),
+            Self::MIN_LATITUDE + Self::LATITUDE_RANGE * ((lat + 1) as f64) / ((1 << 26) as f64),
+        );
+
+        let grid_longitude_range = (
+            Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * (lon as f64) / ((1 << 26) as f64),
+            Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * ((lon + 1) as f64) / ((1 << 26) as f64),
+        );
+
+        return (
+            (grid_longitude_range.0 + grid_longitude_range.1) / 2.0,
+            (grid_latitude_range.0 + grid_latitude_range.1) / 2.0,
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_score() {
+        let test_cases = [
+            // City, Latitude, Longitude, Expected Score
+            ("Bangkok", 13.7220, 100.5252, 3962257306574459.0),
+            ("Beijing", 39.9075, 116.3972, 4069885364908765.0),
+            ("Berlin", 52.5244, 13.4105, 3673983964876493.0),
+            ("Copenhagen", 55.6759, 12.5655, 3685973395504349.0),
+            ("New Delhi", 28.6667, 77.2167, 3631527070936756.0),
+            ("Kathmandu", 27.7017, 85.3206, 3639507404773204.0),
+            ("London", 51.5074, -0.1278, 2163557714755072.0),
+            ("New York", 40.7128, -74.0060, 1791873974549446.0),
+            ("Paris", 48.8534, 2.3488, 3663832752681684.0),
+            ("Sydney", -33.8688, 151.2093, 3252046221964352.0),
+            ("Tokyo", 35.6895, 139.6917, 4171231230197045.0),
+            ("Vienna", 48.2064, 16.3707, 3673109836391743.0),
+        ];
+
+        for (city, latitude, longitude, expected_score) in test_cases {
+            let score = GeoUtils::calculate_score(longitude, latitude);
+            assert_eq!(score, expected_score, "Score for {} should match", city);
+
+            // Verify that decode_score returns coordinates close to the original
+            let (decoded_longitude, decoded_latitude) = GeoUtils::decode_score(score);
+
+            // We allow a small margin of error due to the grid-based nature of the encoding
+            const EPSILON: f64 = 0.01;
+            assert!(
+                (decoded_longitude - longitude).abs() < EPSILON,
+                "Decoded longitude for {} should be close to original: expected {}, got {}",
+                city,
+                longitude,
+                decoded_longitude
+            );
+            assert!(
+                (decoded_latitude - latitude).abs() < EPSILON,
+                "Decoded latitude for {} should be close to original: expected {}, got {}",
+                city,
+                latitude,
+                decoded_latitude
+            );
+        }
     }
 }

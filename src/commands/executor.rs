@@ -281,6 +281,13 @@ impl CommandExecutor for RedisCommandExecutor {
                     }
                 }
             }
+            RedisCommand::GEOPOS(key, member) => match self.storage.geopos(&key, &member) {
+                Some((longitude, latitude)) => RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some(longitude.to_string())),
+                    RedisResponse::BulkString(Some(latitude.to_string())),
+                ]),
+                None => RedisResponse::NullArray,
+            },
         }
     }
 }
