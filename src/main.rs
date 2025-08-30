@@ -5,11 +5,9 @@ use std::io;
 fn main() -> io::Result<()> {
     env_logger::init();
 
-    let addr = "127.0.0.1:6379";
-    println!("Starting Redis server on {}", addr);
-
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();
+    let mut port = 6379;
     let mut dir = None;
     let mut dbfilename = None;
 
@@ -18,9 +16,16 @@ fn main() -> io::Result<()> {
             dir = Some(args[i + 1].clone());
         } else if args[i] == "--dbfilename" && i + 1 < args.len() {
             dbfilename = Some(args[i + 1].clone());
+        } else if args[i] == "--port" && i + 1 < args.len() {
+            if let Ok(p) = args[i + 1].parse::<u16>() {
+                port = p;
+            }
         }
     }
 
-    let mut server = RedisServer::new(addr, dir, dbfilename)?;
+    let addr = format!("127.0.0.1:{}", port);
+    println!("Starting Redis server on {}", addr);
+
+    let mut server = RedisServer::new(&addr, dir, dbfilename)?;
     server.run()
 }
