@@ -18,6 +18,12 @@ impl RedisCommandExecutor {
             handle,
         }
     }
+
+    pub fn new_with_file(handle: EventLoopHandle, directory: String, db_file_name: String) -> Self {
+        let mut storage = MemoryStorage::new(handle.clone());
+        storage.read_from_persistent_storage(&directory, &db_file_name);
+        Self { storage, handle }
+    }
 }
 
 pub trait Transactions {
@@ -295,10 +301,20 @@ impl CommandExecutor for RedisCommandExecutor {
                     .collect();
                 RedisResponse::Array(response_array)
             }
-            RedisCommand::GEODIST(key,from ,to ) => {
-                match self.storage.geodist(&key, &from, &to) {
-                    Some(distance) => RedisResponse::BulkString(Some(format!("{:.5}", distance))),
-                    None => RedisResponse::nil(),
+            RedisCommand::GEODIST(key, from, to) => match self.storage.geodist(&key, &from, &to) {
+                Some(distance) => RedisResponse::BulkString(Some(format!("{:.5}", distance))),
+                None => RedisResponse::nil(),
+            },
+            RedisCommand::CONFIG(subcommand, parameter) => {
+                match subcommand.to_uppercase().as_str() {
+                    "GET" => match self.storage.config_get(&parameter) {
+                        Some(value) => RedisResponse::Array(vec![
+                            RedisResponse::BulkString(Some(parameter)),
+                            RedisResponse::BulkString(Some(value)),
+                        ]),
+                        None => RedisResponse::Array(vec![]),
+                    },
+                    _ => RedisResponse::error("Unsupported CONFIG subcommand"),
                 }
             }
         }

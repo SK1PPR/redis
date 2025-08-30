@@ -95,4 +95,12 @@ impl Storage for MemoryStorage {
             return Some(1);
         }
     }
+
+    fn config_get(&self, parameter: &str) -> Option<String> {
+        match parameter.to_lowercase().as_str() {
+            "dir" => self.dir.clone(),
+            "dbfilename" => self.dbfilename.clone(),
+            _ => None,
+        }
+    }
 }

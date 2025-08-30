@@ -41,6 +41,7 @@ impl CommandParser {
             "GEOADD" => Self::parse_geoadd(&args),
             "GEOPOS" => Self::parse_geopos(&args),
             "GEODIST" => Self::parse_geodist(&args),
+            "CONFIG" => Self::parse_config(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -381,5 +382,15 @@ impl CommandParser {
             args[2].clone(),
             args[3].clone(),
         ))
+    }
+
+    fn parse_config(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for CONFIG GET".to_string());
+        }
+        if args[1].to_uppercase() != "GET" {
+            return Err("Unsupported CONFIG subcommand".to_string());
+        }
+        Ok(RedisCommand::CONFIG(args[1].clone(), args[2].clone()))
     }
 }

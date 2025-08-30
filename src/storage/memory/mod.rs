@@ -5,13 +5,13 @@ use std::time::Instant;
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::stream_member::StreamId;
-use crate::storage::{Storage, StorageList, StorageStream, StorageZSet, StorageGeo, Unit};
+use crate::storage::{Storage, StorageGeo, StorageList, StorageStream, StorageZSet, Unit};
 
 mod storage;
+mod storage_geo;
 mod storage_list;
 mod storage_stream;
 mod storage_zset;
-mod storage_geo;
 
 #[derive(Debug, Clone)]
 enum BlockedType {
@@ -81,6 +81,8 @@ pub struct MemoryStorage {
     storage: HashMap<String, Unit>,
     handle: EventLoopHandle,
     blocked_clients: HashMap<String, Vec<BlockedClient>>,
+    dir: Option<String>,
+    dbfilename: Option<String>,
 }
 
 impl MemoryStorage {
@@ -89,6 +91,8 @@ impl MemoryStorage {
             storage: HashMap::new(),
             handle,
             blocked_clients: HashMap::new(),
+            dir: None,
+            dbfilename: None,
         }
     }
 
@@ -289,5 +293,12 @@ impl MemoryStorage {
         } else {
             "none".to_string()
         }
+    }
+
+    pub fn read_from_persistent_storage(&mut self, _dir: &str, _dbfilename: &str) {
+        self.dir = Some(_dir.to_string());
+        self.dbfilename = Some(_dbfilename.to_string());
+        // Placeholder for reading from persistent storage
+        log::info!("Reading data from persistent storage is not yet implemented.");
     }
 }

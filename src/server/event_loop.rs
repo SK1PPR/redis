@@ -37,6 +37,39 @@ pub struct EventLoop {
 }
 
 impl EventLoop {
+    pub fn new_with_file(
+        mut server: TcpListener,
+        dir: String,
+        dbfilename: String,
+    ) -> io::Result<Self> {
+        let poll = Poll::new()?;
+        let events = Events::with_capacity(128);
+        let waker = std::sync::Arc::new(Waker::new(poll.registry(), WAKER_TOKEN)?);
+
+        // Create communication channel
+        let (sender, receiver) = mpsc::channel();
+        let handle = EventLoopHandle::new(sender, std::sync::Arc::clone(&waker));
+        // Register server socket for accept events
+        poll.registry()
+            .register(&mut server, SERVER_TOKEN, Interest::READABLE)?;
+
+        let event_loop = EventLoop {
+            poll,
+            events,
+            server,
+            clients: HashMap::new(),
+            command_executor: RedisCommandExecutor::new_with_file(handle.clone(), dir, dbfilename),
+            next_token: 1, // 0 is reserved for server
+            waker,
+            message_receiver: receiver,
+            event_loop_handle: handle,
+            blocked_clients_timeout: HashMap::new(),
+            multi_clients: HashSet::new(),
+        };
+
+        Ok(event_loop)
+    }
+
     pub fn new(mut server: TcpListener) -> io::Result<Self> {
         let poll = Poll::new()?;
         let events = Events::with_capacity(128);
