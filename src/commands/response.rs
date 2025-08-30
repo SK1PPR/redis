@@ -9,6 +9,7 @@ pub enum RedisResponse {
     Error(String),
     Blocked, // Timeout in seconds
     Empty,
+    NullArray,
 }
 
 impl RedisResponse {
@@ -19,9 +20,6 @@ impl RedisResponse {
             RedisResponse::BulkString(None) => "$-1\r\n".to_string(),
             RedisResponse::Integer(i) => format!(":{}\r\n", i),
             RedisResponse::Array(arr) => {
-                if arr.is_empty() {
-                    return "*-1\r\n".to_string(); // Null array
-                }
                 let mut result = format!("*{}\r\n", arr.len());
                 for item in arr {
                     result.push_str(&item.to_resp());
@@ -30,6 +28,7 @@ impl RedisResponse {
             }
             RedisResponse::Error(e) => format!("-ERR {}\r\n", e),
             RedisResponse::Empty | RedisResponse::Blocked => "".to_string(),
+            RedisResponse::NullArray => "*-1\r\n".to_string(),
         }
     }
 
@@ -54,7 +53,7 @@ impl RedisResponse {
     }
 
     pub fn null_array() -> Self {
-        RedisResponse::Array(vec![])
+        RedisResponse::NullArray
     }
 }
 
