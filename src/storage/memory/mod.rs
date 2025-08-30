@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
+use crate::storage::stream_member::StreamId;
 use crate::storage::{Storage, StorageList, StorageStream, StorageZSet, Unit};
 
 mod storage;
@@ -12,10 +13,66 @@ mod storage_stream;
 mod storage_zset;
 
 #[derive(Debug, Clone)]
+enum BlockedType {
+    List(bool),       // true for BLPOP, false for BRPOP
+    Stream(StreamId), // ID to read after
+}
+
+#[derive(Debug, Clone)]
 pub struct BlockedClient {
     token: Token,
     timeout: Option<Instant>,
-    left_blocked: bool,
+    blocked_type: BlockedType,
+}
+
+impl BlockedClient {
+    pub fn new_list(token: Token, timeout: Option<Instant>, left_blocked: bool) -> Self {
+        Self {
+            token,
+            timeout,
+            blocked_type: BlockedType::List(left_blocked),
+        }
+    }
+
+    pub fn new_stream(token: Token, timeout: Option<Instant>, id: StreamId) -> Self {
+        Self {
+            token,
+            timeout,
+            blocked_type: BlockedType::Stream(id),
+        }
+    }
+
+    pub fn is_timed_out(&self) -> bool {
+        if let Some(timeout) = self.timeout {
+            Instant::now() >= timeout
+        } else {
+            false
+        }
+    }
+
+    pub fn by_list(&self) -> bool {
+        matches!(self.blocked_type, BlockedType::List(_))
+    }
+
+    pub fn by_stream(&self) -> bool {
+        matches!(self.blocked_type, BlockedType::Stream(_))
+    }
+
+    pub fn left_blocked(&self) -> bool {
+        if let BlockedType::List(left) = self.blocked_type {
+            left
+        } else {
+            false
+        }
+    }
+
+    pub fn stream_id(&self) -> Option<&StreamId> {
+        if let BlockedType::Stream(ref id) = self.blocked_type {
+            Some(id)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -51,7 +108,7 @@ impl MemoryStorage {
     }
 
     // Helper method to unblock clients waiting on a specific key
-    fn unblock_clients_for_key(&mut self, key: &str) {
+    fn unblock_clients_for_key(&mut self, key: &str, blocked_on_list: bool) {
         if let Some(blocked_clients) = self.blocked_clients.remove(key) {
             log::debug!(
                 "Unblocking {} clients waiting for key '{}'",
@@ -60,58 +117,26 @@ impl MemoryStorage {
             );
 
             for blocked_client in blocked_clients.clone() {
-                // Make sure the client is still blocked
-                if blocked_client.timeout.is_some()
-                    && blocked_client.timeout.unwrap() < Instant::now()
-                {
+                if blocked_client.is_timed_out() {
                     log::debug!(
                         "Client with token {:?} has timed out while waiting for key '{}'",
                         blocked_client.token,
                         key
                     );
-                    continue; // Skip timed-out clients
+                    continue;
                 }
 
-                // Try to pop an element for this client
-                let response = if blocked_client.left_blocked {
-                    // BLPOP - pop from left
-                    if let Some(mut popped) = self.lpop(key, 1) {
-                        if !popped.is_empty() {
-                            RedisResponse::Array(vec![
-                                RedisResponse::BulkString(Some(key.to_string())),
-                                RedisResponse::BulkString(Some(popped.remove(0))),
-                            ])
-                        } else {
-                            continue; // No element available, keep client blocked
-                        }
-                    } else {
-                        continue; // Key doesn't exist or no elements
-                    }
+                let response = if blocked_on_list {
+                    self.response_blocked_on_list(blocked_client.clone(), key)
                 } else {
-                    // BRPOP - pop from right
-                    if let Some(list) = self
-                        .storage
-                        .get_mut(key)
-                        .and_then(|unit| unit.implementation.as_list_mut())
-                    {
-                        if !list.is_empty() {
-                            let item = list.remove(list.len() - 1);
-                            if list.is_empty() {
-                                self.storage.remove(key);
-                            }
-                            RedisResponse::Array(vec![
-                                RedisResponse::BulkString(Some(key.to_string())),
-                                RedisResponse::BulkString(Some(item)),
-                            ])
-                        } else {
-                            continue; // No elements available
-                        }
-                    } else {
-                        continue; // Key doesn't exist
-                    }
+                    self.response_blocked_on_stream(blocked_client.clone(), key)
                 };
 
-                // Unblock the client with the response
+                if response.is_none() {
+                    continue;
+                }
+
+                let response = response.unwrap();
                 self.handle.unblock_client(blocked_client.token, response);
 
                 // If we successfully unblocked a client, we might have consumed the only element
@@ -122,17 +147,106 @@ impl MemoryStorage {
                     .and_then(|unit| unit.implementation.as_list())
                 {
                     if list.is_empty() {
-                        // No more elements, re-block remaining clients
                         self.reblock_remaining_clients(key, blocked_clients, blocked_client.token);
                         break;
                     }
                 } else {
-                    // Key no longer exists, re-block remaining clients
                     self.reblock_remaining_clients(key, blocked_clients, blocked_client.token);
                     break;
                 }
             }
         }
+    }
+
+    fn response_blocked_on_list(
+        &mut self,
+        blocked_client: BlockedClient,
+        key: &str,
+    ) -> Option<RedisResponse> {
+        if !blocked_client.by_list() {
+            return None;
+        }
+
+        if blocked_client.left_blocked() {
+            // BLPOP - pop from left
+            if let Some(mut popped) = self.lpop(key, 1) {
+                if !popped.is_empty() {
+                    Some(RedisResponse::Array(vec![
+                        RedisResponse::BulkString(Some(key.to_string())),
+                        RedisResponse::BulkString(Some(popped.remove(0))),
+                    ]))
+                } else {
+                    None // No element available, keep client blocked
+                }
+            } else {
+                None // Key doesn't exist or no elements
+            }
+        } else {
+            // BRPOP - pop from right
+            if let Some(list) = self
+                .storage
+                .get_mut(key)
+                .and_then(|unit| unit.implementation.as_list_mut())
+            {
+                if !list.is_empty() {
+                    let item = list.remove(list.len() - 1);
+                    if list.is_empty() {
+                        self.storage.remove(key);
+                    }
+                    Some(RedisResponse::Array(vec![
+                        RedisResponse::BulkString(Some(key.to_string())),
+                        RedisResponse::BulkString(Some(item)),
+                    ]))
+                } else {
+                    None // No elements available
+                }
+            } else {
+                None // Key doesn't exist
+            }
+        }
+    }
+
+    fn response_blocked_on_stream(
+        &mut self,
+        blocked_client: BlockedClient,
+        key: &str,
+    ) -> Option<RedisResponse> {
+        if !blocked_client.by_stream() {
+            return None;
+        }
+
+        let last_id = blocked_client.stream_id()?;
+
+        if let Some(entries) = self.xrange(
+            key,
+            StreamId::next(last_id).to_string(),
+            StreamId {
+                timestamp: u64::MAX,
+                sequence: u64::MAX,
+            }
+            .to_string(),
+        ) {
+            if !entries.is_empty() {
+                let mut response_entries = Vec::new();
+                for (entry_id, fields) in entries {
+                    let mut field_responses = Vec::new();
+                    for (field, value) in fields {
+                        field_responses.push(RedisResponse::BulkString(Some(field)));
+                        field_responses.push(RedisResponse::BulkString(Some(value)));
+                    }
+                    response_entries.push(RedisResponse::Array(vec![
+                        RedisResponse::BulkString(Some(entry_id)),
+                        RedisResponse::Array(field_responses),
+                    ]));
+                }
+                return Some(RedisResponse::Array(vec![RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some(key.to_string())),
+                    RedisResponse::Array(response_entries),
+                ])]));
+            }
+        }
+
+        None // No new entries available
     }
 
     // Helper to re-block clients that couldn't be satisfied
@@ -142,7 +256,6 @@ impl MemoryStorage {
         mut all_clients: Vec<BlockedClient>,
         satisfied_token: Token,
     ) {
-        // Remove the client we just satisfied and re-block the rest
         all_clients.retain(|client| client.token.0 != satisfied_token.0);
 
         if !all_clients.is_empty() {
@@ -152,6 +265,8 @@ impl MemoryStorage {
                 self.blocked_clients.get(key).map_or(0, |v| v.len()),
                 key
             );
+        } else {
+            self.blocked_clients.remove(key);
         }
     }
 

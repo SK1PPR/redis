@@ -232,7 +232,7 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
                 None => RedisResponse::Array(vec![]),
             },
-            RedisCommand::XREAD(block, streams) => match self.storage.xread(block, streams) {
+            RedisCommand::XREAD(block, streams) => match self.storage.xread(token, block, streams) {
                 Some(results) => {
                     if results.is_empty() {
                         RedisResponse::Array(vec![])
@@ -266,7 +266,7 @@ impl CommandExecutor for RedisCommandExecutor {
                         )
                     }
                 }
-                None => RedisResponse::NullArray,
+                None => RedisResponse::Empty,
             },
         }
     }

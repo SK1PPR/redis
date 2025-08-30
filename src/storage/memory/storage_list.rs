@@ -34,7 +34,7 @@ impl StorageList for MemoryStorage {
         };
 
         // Unblock any clients waiting for this key
-        self.unblock_clients_for_key(&key);
+        self.unblock_clients_for_key(&key, true);
 
         list_length
     }
@@ -116,7 +116,7 @@ impl StorageList for MemoryStorage {
         };
 
         // Unblock any clients waiting for this key
-        self.unblock_clients_for_key(&key);
+        self.unblock_clients_for_key(&key, true);
 
         list_length
     }
@@ -171,16 +171,15 @@ impl StorageList for MemoryStorage {
             }
         }
 
-        // If none of the lists have elements, block the client
-        let blocked_client = BlockedClient {
+        let blocked_client = BlockedClient::new_list(
             token,
-            timeout: if timeout != 0 {
+            if timeout != 0 {
                 Some(Instant::now() + Duration::from_millis(timeout as u64))
             } else {
                 None
             },
-            left_blocked: true,
-        };
+            true,
+        );
 
         for key in keys {
             self.blocked_clients
@@ -215,16 +214,15 @@ impl StorageList for MemoryStorage {
             }
         }
 
-        // If none of the lists have elements, block the client
-        let blocked_client = BlockedClient {
+        let blocked_client = BlockedClient::new_list(
             token,
-            timeout: if timeout != 0 {
+            if timeout != 0 {
                 Some(Instant::now() + Duration::from_millis(timeout as u64))
             } else {
                 None
             },
-            left_blocked: false,
-        };
+            false,
+        );
 
         for key in keys {
             self.blocked_clients

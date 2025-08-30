@@ -34,6 +34,13 @@ impl StreamId {
     pub fn to_string(&self) -> String {
         format!("{}-{}", self.timestamp, self.sequence)
     }
+
+    pub fn next(&self) -> StreamId {
+        StreamId {
+            timestamp: self.timestamp,
+            sequence: self.sequence + 1,
+        }
+    }
 }
 
 pub const EMPTY_STREAM_ID: StreamId = StreamId {

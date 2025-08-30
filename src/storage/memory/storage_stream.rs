@@ -1,7 +1,12 @@
+use mio::Token;
 use std::time::SystemTime;
+use std::time::{Duration, Instant};
 
 use super::{MemoryStorage, StorageStream, Unit};
-use crate::storage::stream_member::{StreamId, StreamMember, EMPTY_STREAM_ID};
+use crate::storage::{
+    memory::BlockedClient,
+    stream_member::{StreamId, StreamMember, EMPTY_STREAM_ID},
+};
 
 impl StorageStream for MemoryStorage {
     fn xadd(
@@ -12,6 +17,7 @@ impl StorageStream for MemoryStorage {
     ) -> Result<String, String> {
         log::debug!("XADD called for key '{}'", key);
         let unit = self.storage.get_mut(&key);
+        let result_id: String;
         match unit {
             Some(u) => {
                 if u.is_expired() || !u.implementation.is_stream() {
@@ -42,7 +48,7 @@ impl StorageStream for MemoryStorage {
                         id: entry_id.clone(),
                         fields,
                     });
-                    Ok(entry_id.to_string())
+                    result_id = entry_id.to_string();
                 } else {
                     return Err("Key does not exist or is not a stream".to_string());
                 }
@@ -58,10 +64,14 @@ impl StorageStream for MemoryStorage {
                     id: entry_id.clone(),
                     fields,
                 });
-                self.storage.insert(key, Unit::new_stream(new_stream, None));
-                Ok(entry_id.to_string())
+                self.storage
+                    .insert(key.clone(), Unit::new_stream(new_stream, None));
+                result_id = entry_id.to_string();
             }
         }
+
+        self.unblock_clients_for_key(&key, false);
+        return Ok(result_id);
     }
 
     fn xrange(
@@ -90,7 +100,8 @@ impl StorageStream for MemoryStorage {
     }
 
     fn xread(
-        &self,
+        &mut self,
+        token: Token,
         block: Option<u64>,
         streams: Vec<(String, String)>,
     ) -> Option<Vec<(String, Vec<(String, Vec<(String, String)>)>)>> {
@@ -101,8 +112,8 @@ impl StorageStream for MemoryStorage {
         );
         let mut result = Vec::new();
 
-        for (key, id) in streams {
-            let unit = self.storage.get(&key)?;
+        for (key, id) in &streams {
+            let unit = self.storage.get(key)?;
             if unit.is_expired() || !unit.implementation.is_stream() {
                 log::debug!("Key '{}' has expired or is not a stream", key);
                 continue;
@@ -122,9 +133,34 @@ impl StorageStream for MemoryStorage {
         }
 
         if result.is_empty() && block.is_some() {
-            // In a real implementation, we would block the client here.
-            // For this in-memory mock, we'll just return None to indicate no data.
             log::debug!("No new entries found, would block for {:?}", block);
+            for (key, id) in streams {
+                let last_id: StreamId;
+                if id == "$" {
+                    let stream = self.storage.get(&key)?.implementation.as_stream()?;
+                    last_id = if let Some(last) = stream.last() {
+                        last.id.clone()
+                    } else {
+                        EMPTY_STREAM_ID.clone()
+                    };
+                } else {
+                    last_id = generate_query_id(&id);
+                }
+                let blocked_client = BlockedClient::new_stream(
+                    token,
+                    if let Some(timeout) = block {
+                        Some(Instant::now() + Duration::from_millis(timeout))
+                    } else {
+                        None
+                    },
+                    last_id,
+                );
+                self.blocked_clients
+                    .entry(key)
+                    .or_insert_with(Vec::new)
+                    .push(blocked_client);
+            }
+            self.handle.block_client(token, block.unwrap_or(0));
             return None;
         }
 
