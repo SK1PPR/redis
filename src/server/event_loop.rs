@@ -447,7 +447,7 @@ impl EventLoop {
             if let Some(client) = self.clients.get_mut(&token) {
                 if client.is_blocked() {
                     log::debug!("Client {} has timed out", token.0);
-                    self.unblock_client_internal(token, RedisResponse::nil())?;
+                    self.unblock_client_internal(token, RedisResponse::null_array())?;
                 }
             }
         }

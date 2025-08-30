@@ -19,6 +19,9 @@ impl RedisResponse {
             RedisResponse::BulkString(None) => "$-1\r\n".to_string(),
             RedisResponse::Integer(i) => format!(":{}\r\n", i),
             RedisResponse::Array(arr) => {
+                if arr.is_empty() {
+                    return "*-1\r\n".to_string(); // Null array
+                }
                 let mut result = format!("*{}\r\n", arr.len());
                 for item in arr {
                     result.push_str(&item.to_resp());
@@ -48,6 +51,10 @@ impl RedisResponse {
 
     pub fn queued() -> Self {
         RedisResponse::SimpleString("QUEUED".to_string())
+    }
+
+    pub fn null_array() -> Self {
+        RedisResponse::Array(vec![])
     }
 }
 
