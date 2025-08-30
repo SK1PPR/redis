@@ -1,4 +1,5 @@
 use super::{MemoryStorage, Storage, Unit};
+use regex;
 
 impl Storage for MemoryStorage {
     fn get(&mut self, key: &str) -> Option<String> {
@@ -102,5 +103,22 @@ impl Storage for MemoryStorage {
             "dbfilename" => self.dbfilename.clone(),
             _ => None,
         }
+    }
+
+    fn get_keys(&self, pattern: &str) -> Vec<String> {
+        let regex_pattern = pattern.replace("*", ".*").replace("?", ".");
+        let regex = match regex::Regex::new(&format!("^{}$", regex_pattern)) {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("Invalid pattern '{}': {}", pattern, e);
+                return vec![];
+            }
+        };
+
+        self.storage
+            .keys()
+            .filter(|key| regex.is_match(key))
+            .cloned()
+            .collect()
     }
 }

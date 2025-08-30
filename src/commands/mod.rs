@@ -39,5 +39,6 @@ pub enum RedisCommand {
     GEOADD(String, f64, f64, String),
     GEOPOS(String, Vec<String>),
     GEODIST(String, String, String),
-    CONFIG(String, String)
+    CONFIG(String, String),
+    KEYS(String)
 }

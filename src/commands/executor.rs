@@ -317,6 +317,18 @@ impl CommandExecutor for RedisCommandExecutor {
                     _ => RedisResponse::error("Unsupported CONFIG subcommand"),
                 }
             }
+            RedisCommand::KEYS(pattern) => {
+                let keys = self.storage.get_keys(&pattern);
+                if keys.is_empty() {
+                    RedisResponse::Array(vec![])
+                } else {
+                    RedisResponse::Array(
+                        keys.into_iter()
+                            .map(|key| RedisResponse::BulkString(Some(key)))
+                            .collect(),
+                    )
+                }
+            }
         }
     }
 }

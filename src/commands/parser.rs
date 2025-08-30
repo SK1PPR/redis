@@ -42,6 +42,7 @@ impl CommandParser {
             "GEOPOS" => Self::parse_geopos(&args),
             "GEODIST" => Self::parse_geodist(&args),
             "CONFIG" => Self::parse_config(&args),
+            "KEYS" => Self::parse_keys(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -392,5 +393,19 @@ impl CommandParser {
             return Err("Unsupported CONFIG subcommand".to_string());
         }
         Ok(RedisCommand::CONFIG(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_keys(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for KEYS".to_string());
+        }
+
+        // Remove the quotes if present
+        if args[1].starts_with('"') && args[1].ends_with('"') && args[1].len() >= 2 {
+            let pattern = args[1][1..args[1].len() - 1].to_string();
+            return Ok(RedisCommand::KEYS(pattern));
+        }
+
+        Ok(RedisCommand::KEYS(args[1].clone()))
     }
 }

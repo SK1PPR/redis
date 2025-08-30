@@ -17,6 +17,7 @@ pub trait Storage {
     fn set_with_expiry(&mut self, key: String, value: String, expiry: u128);
     fn incr(&mut self, key: String) -> Option<i64>;
     fn config_get(&self, parameter: &str) -> Option<String>;
+    fn get_keys(&self, pattern: &str) -> Vec<String>;
 }
 
 pub trait StorageList {
