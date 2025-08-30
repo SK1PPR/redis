@@ -2,6 +2,7 @@ pub mod memory;
 mod stream_member;
 pub mod unit;
 mod zset_member;
+mod file_utils;
 
 pub use memory::MemoryStorage;
 pub use unit::Unit;

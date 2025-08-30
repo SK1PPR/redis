@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
+use crate::storage::file_utils::FileUtils;
 use crate::storage::stream_member::StreamId;
 use crate::storage::{Storage, StorageGeo, StorageList, StorageStream, StorageZSet, Unit};
 
@@ -295,10 +296,32 @@ impl MemoryStorage {
         }
     }
 
-    pub fn read_from_persistent_storage(&mut self, _dir: &str, _dbfilename: &str) {
-        self.dir = Some(_dir.to_string());
-        self.dbfilename = Some(_dbfilename.to_string());
-        // Placeholder for reading from persistent storage
-        log::info!("Reading data from persistent storage is not yet implemented.");
+    pub fn read_from_persistent_storage(&mut self, dir: &str, dbfilename: &str) {
+        self.dir = Some(dir.to_string());
+        self.dbfilename = Some(dbfilename.to_string());
+
+        if FileUtils::validate_db_file(dir, dbfilename) {
+            log::info!(
+                "Reading data from persistent storage at {}/{}",
+                dir,
+                dbfilename
+            );
+            match FileUtils::construct_db_from_file(dir, dbfilename) {
+                Some(loaded_storage) => {
+                    self.storage = loaded_storage;
+                    log::info!(
+                        "Successfully loaded {} keys from persistent storage",
+                        self.storage.len()
+                    );
+                }
+                None => {
+                    println!("Error reading persistent storage");
+                    log::error!("Error reading persistent storage");
+                }
+            }
+            return;
+        }
+        println!("Persistent storage file not found or invalid. Starting with empty storage.");
+        log::info!("Persistent storage file not found or invalid. Starting with empty storage.");
     }
 }
