@@ -340,7 +340,6 @@ impl CommandParser {
             idx += 1;
             id_idx += 1;
         }
-
         Ok(RedisCommand::XREAD(block_time, key_id_pairs))
     }
 }

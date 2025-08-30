@@ -265,8 +265,6 @@ impl MemoryStorage {
                 self.blocked_clients.get(key).map_or(0, |v| v.len()),
                 key
             );
-        } else {
-            self.blocked_clients.remove(key);
         }
     }
 

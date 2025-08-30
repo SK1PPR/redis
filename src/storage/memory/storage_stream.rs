@@ -119,6 +119,9 @@ impl StorageStream for MemoryStorage {
                 continue;
             }
             let stream = unit.implementation.as_stream()?;
+            if id == "$" {
+                continue;
+            }
             let last_id = generate_query_id(&id);
 
             let mut entries = Vec::new();
@@ -146,14 +149,15 @@ impl StorageStream for MemoryStorage {
                 } else {
                     last_id = generate_query_id(&id);
                 }
+                let timeout = block.unwrap_or(0);
                 let blocked_client = BlockedClient::new_stream(
                     token,
-                    if let Some(timeout) = block {
-                        Some(Instant::now() + Duration::from_millis(timeout))
+                    if timeout != 0 {
+                        Some(Instant::now() + Duration::from_millis(timeout as u64))
                     } else {
                         None
                     },
-                    last_id,
+                    last_id.clone(),
                 );
                 self.blocked_clients
                     .entry(key)
