@@ -1,4 +1,4 @@
-use crate::storage::zset_member::ZSetMember;
+use crate::storage::zset_member::{Member, ZSetMember};
 
 use super::{MemoryStorage, Storage, StorageZSet, Unit};
 
@@ -17,20 +17,23 @@ impl StorageZSet for MemoryStorage {
                     log::debug!("Key '{}' has expired or is not a sorted set", key);
                     self.delete(&key);
                     let mut new_set = std::collections::BTreeSet::new();
-                    new_set.insert(ZSetMember { score, member });
+                    new_set.insert(ZSetMember::simple_member(member, score));
                     let new_unit = Unit::new_zset(new_set, None);
                     self.storage.insert(key, new_unit);
                     return 1;
                 }
                 if let Some(zset) = u.implementation.as_zset_mut() {
                     // Check if member already exists
-                    if zset.iter().any(|m| m.member == member) {
+                    if zset
+                        .iter()
+                        .any(|m| m.member == Member::Simple(member.clone()))
+                    {
                         // ZSetMember exists, update score
-                        zset.retain(|m| m.member != member); // Remove old entry
-                        zset.insert(ZSetMember { score, member }); // Insert updated entry
+                        zset.retain(|m| m.member != Member::Simple(member.clone())); // Remove old entry
+                        zset.insert(ZSetMember::simple_member(member, score)); // Insert updated entry
                         return 0;
                     } else {
-                        zset.insert(ZSetMember { score, member });
+                        zset.insert(ZSetMember::simple_member(member, score));
                         return 1;
                     }
                 }
@@ -38,7 +41,7 @@ impl StorageZSet for MemoryStorage {
             }
             None => {
                 let mut new_set = std::collections::BTreeSet::new();
-                new_set.insert(ZSetMember { score, member });
+                new_set.insert(ZSetMember::simple_member(member, score));
                 let new_unit = Unit::new_zset(new_set, None);
                 self.storage.insert(key, new_unit);
                 1
@@ -59,7 +62,7 @@ impl StorageZSet for MemoryStorage {
         }
         let zset = unit.implementation.as_zset()?;
         for (idx, m) in zset.iter().enumerate() {
-            if m.member == member {
+            if m.member == Member::Simple(member.to_string()) {
                 return Some(idx);
             }
         }
@@ -105,7 +108,7 @@ impl StorageZSet for MemoryStorage {
             zset.iter()
                 .skip(start)
                 .take(end - start + 1)
-                .map(|m| m.member.clone())
+                .map(|m| m.member.clone().to_string())
                 .collect(),
         )
     }
@@ -141,7 +144,7 @@ impl StorageZSet for MemoryStorage {
         }
         let zset = unit.implementation.as_zset()?;
         for m in zset.iter() {
-            if m.member == member {
+            if m.member == Member::Simple(member.to_string()) {
                 return Some(m.score);
             }
         }
@@ -160,7 +163,7 @@ impl StorageZSet for MemoryStorage {
                 }
                 if let Some(zset) = u.implementation.as_zset_mut() {
                     let initial_len = zset.len();
-                    zset.retain(|m| m.member != member);
+                    zset.retain(|m| m.member != Member::Simple(member.to_string()));
                     return zset.len() < initial_len;
                 }
                 false
