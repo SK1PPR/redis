@@ -5,12 +5,13 @@ use std::time::Instant;
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::stream_member::StreamId;
-use crate::storage::{Storage, StorageList, StorageStream, StorageZSet, Unit};
+use crate::storage::{Storage, StorageList, StorageStream, StorageZSet, StorageGeo, Unit};
 
 mod storage;
 mod storage_list;
 mod storage_stream;
 mod storage_zset;
+mod storage_geo;
 
 #[derive(Debug, Clone)]
 enum BlockedType {

@@ -78,6 +78,10 @@ impl ZSetMember {
             }),
         }
     }
+
+    pub fn is_geo(&self) -> bool {
+        matches!(self.member, Member::Geo(_))
+    }
 }
 
 impl PartialEq for ZSetMember {

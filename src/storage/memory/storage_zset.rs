@@ -13,7 +13,7 @@ impl StorageZSet for MemoryStorage {
         let unit = self.storage.get_mut(&key);
         match unit {
             Some(u) => {
-                if u.is_expired() || !u.implementation.is_zset() {
+                if u.is_expired() || !u.implementation.is_zset() || u.implementation.is_zset_geo() {
                     log::debug!("Key '{}' has expired or is not a sorted set", key);
                     self.delete(&key);
                     let mut new_set = std::collections::BTreeSet::new();

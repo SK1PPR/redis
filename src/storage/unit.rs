@@ -108,6 +108,15 @@ impl Implementation {
             None
         }
     }
+
+    pub fn is_zset_geo(&self) -> bool {
+        if let Implementation::ZSET(ref zset) = self {
+            if let Some(first) = zset.iter().next() {
+                return first.is_geo();
+            }
+        }
+        false
+    }
 }
 
 #[derive(Debug, Clone)]

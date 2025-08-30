@@ -36,4 +36,5 @@ pub enum RedisCommand {
     XADD(String, Option<String>, Vec<(String, String)>),
     XRANGE(String, String, String),
     XREAD(Option<u64>,Vec<(String, String)>),
+    GEOADD(String, f64, f64, String),
 }

@@ -38,6 +38,7 @@ impl CommandParser {
             "XADD" => Self::parse_xadd(&args),
             "XRANGE" => Self::parse_xrange(&args),
             "XREAD" => Self::parse_xread(&args),
+            "GEOADD" => Self::parse_geoadd(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -341,5 +342,24 @@ impl CommandParser {
             id_idx += 1;
         }
         Ok(RedisCommand::XREAD(block_time, key_id_pairs))
+    }
+
+    fn parse_geoadd(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 5 {
+            return Err("Wrong number of arguments for GEOADD".to_string());
+        }
+        let longitude = args[2]
+            .parse::<f64>()
+            .map_err(|_| "Invalid longitude value".to_string())?;
+        let latitude = args[3]
+            .parse::<f64>()
+            .map_err(|_| "Invalid latitude value".to_string())?;
+        let member = args[4].clone();
+        Ok(RedisCommand::GEOADD(
+            args[1].clone(),
+            longitude,
+            latitude,
+            member,
+        ))
     }
 }

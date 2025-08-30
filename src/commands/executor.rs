@@ -1,6 +1,6 @@
 use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
-use crate::storage::{MemoryStorage, Storage, StorageList, StorageStream, StorageZSet};
+use crate::storage::{MemoryStorage, Storage, StorageGeo, StorageList, StorageStream, StorageZSet};
 use mio::Token;
 
 pub trait CommandExecutor {
@@ -232,42 +232,50 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
                 None => RedisResponse::Array(vec![]),
             },
-            RedisCommand::XREAD(block, streams) => match self.storage.xread(token, block, streams) {
-                Some(results) => {
-                    if results.is_empty() {
-                        RedisResponse::Array(vec![])
-                    } else {
-                        RedisResponse::Array(
-                            results
-                                .into_iter()
-                                .map(|(key, entries)| {
-                                    let entry_array: Vec<RedisResponse> = entries
-                                        .into_iter()
-                                        .map(|(id, fields)| {
-                                            let mut field_array = Vec::new();
-                                            for (field, value) in fields {
-                                                field_array
-                                                    .push(RedisResponse::BulkString(Some(field)));
-                                                field_array
-                                                    .push(RedisResponse::BulkString(Some(value)));
-                                            }
-                                            RedisResponse::Array(vec![
-                                                RedisResponse::BulkString(Some(id)),
-                                                RedisResponse::Array(field_array),
-                                            ])
-                                        })
-                                        .collect();
-                                    RedisResponse::Array(vec![
-                                        RedisResponse::BulkString(Some(key)),
-                                        RedisResponse::Array(entry_array),
-                                    ])
-                                })
-                                .collect(),
-                        )
+            RedisCommand::XREAD(block, streams) => {
+                match self.storage.xread(token, block, streams) {
+                    Some(results) => {
+                        if results.is_empty() {
+                            RedisResponse::Array(vec![])
+                        } else {
+                            RedisResponse::Array(
+                                results
+                                    .into_iter()
+                                    .map(|(key, entries)| {
+                                        let entry_array: Vec<RedisResponse> = entries
+                                            .into_iter()
+                                            .map(|(id, fields)| {
+                                                let mut field_array = Vec::new();
+                                                for (field, value) in fields {
+                                                    field_array.push(RedisResponse::BulkString(
+                                                        Some(field),
+                                                    ));
+                                                    field_array.push(RedisResponse::BulkString(
+                                                        Some(value),
+                                                    ));
+                                                }
+                                                RedisResponse::Array(vec![
+                                                    RedisResponse::BulkString(Some(id)),
+                                                    RedisResponse::Array(field_array),
+                                                ])
+                                            })
+                                            .collect();
+                                        RedisResponse::Array(vec![
+                                            RedisResponse::BulkString(Some(key)),
+                                            RedisResponse::Array(entry_array),
+                                        ])
+                                    })
+                                    .collect(),
+                            )
+                        }
                     }
+                    None => RedisResponse::Empty,
                 }
-                None => RedisResponse::Empty,
-            },
+            }
+            RedisCommand::GEOADD(key, longitude, latitude, member) => {
+                let added = self.storage.geoadd(key, longitude, latitude, member);
+                RedisResponse::Integer(added as i64)
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
+mod geo_member;
 pub mod memory;
+mod stream_member;
 pub mod unit;
 mod zset_member;
-mod stream_member;
-mod geo_member;
 
 pub use memory::MemoryStorage;
 pub use unit::Unit;
@@ -38,7 +38,26 @@ pub trait StorageZSet {
 }
 
 pub trait StorageStream {
-    fn xadd(&mut self, key: String, id: String, fields: Vec<(String, String)>) -> Result<String, String>;
-    fn xrange(&self, key: &str, start: String, end: String) -> Option<Vec<(String, Vec<(String, String)>)>>;
-    fn xread(&mut self, token: mio::Token, block: Option<u64>, streams: Vec<(String, String)>) -> Option<Vec<(String, Vec<(String, Vec<(String, String)>)>)>>;
+    fn xadd(
+        &mut self,
+        key: String,
+        id: String,
+        fields: Vec<(String, String)>,
+    ) -> Result<String, String>;
+    fn xrange(
+        &self,
+        key: &str,
+        start: String,
+        end: String,
+    ) -> Option<Vec<(String, Vec<(String, String)>)>>;
+    fn xread(
+        &mut self,
+        token: mio::Token,
+        block: Option<u64>,
+        streams: Vec<(String, String)>,
+    ) -> Option<Vec<(String, Vec<(String, Vec<(String, String)>)>)>>;
+}
+
+pub trait StorageGeo {
+    fn geoadd(&mut self, key: String, longitude: f64, latitude: f64, member: String) -> usize;
 }
