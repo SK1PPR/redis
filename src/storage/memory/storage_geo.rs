@@ -66,7 +66,7 @@ impl StorageGeo for MemoryStorage {
             members,
             key
         );
-        
+
         let unit = self.storage.get(key);
         match unit {
             Some(u) => {
@@ -74,19 +74,57 @@ impl StorageGeo for MemoryStorage {
                     log::debug!("Key '{}' has expired or is not a geo set", key);
                     return vec![None; members.len()];
                 }
-                
+
                 if let Some(zset) = u.implementation.as_zset() {
                     // Process each member and collect results
-                    members.iter().map(|member| {
-                        zset.iter()
-                            .find(|m| m.member == *member)
-                            .map(|zset_member| GeoUtils::decode_score(zset_member.score))
-                    }).collect()
+                    members
+                        .iter()
+                        .map(|member| {
+                            zset.iter()
+                                .find(|m| m.member == *member)
+                                .map(|zset_member| GeoUtils::decode_score(zset_member.score))
+                        })
+                        .collect()
                 } else {
                     vec![None; members.len()]
                 }
             }
             None => vec![None; members.len()],
+        }
+    }
+
+    fn geodist(&self, key: &str, member1: &str, member2: &str) -> Option<f64> {
+        log::debug!(
+            "Calculating distance between members '{}' and '{}' in geo set '{}'",
+            member1,
+            member2,
+            key
+        );
+
+        let unit = self.storage.get(key);
+        match unit {
+            Some(u) => {
+                if u.is_expired() || !u.implementation.is_zset() {
+                    log::debug!("Key '{}' has expired or is not a geo set", key);
+                    return None;
+                }
+
+                if let Some(zset) = u.implementation.as_zset() {
+                    let pos1 = zset.iter().find(|m| m.member == member1);
+                    let pos2 = zset.iter().find(|m| m.member == member2);
+
+                    match (pos1, pos2) {
+                        (Some(m1), Some(m2)) => {
+                            let distance = GeoUtils::calculate_distance(m1.score, m2.score);
+                            Some(distance)
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            None => None,
         }
     }
 }
@@ -163,20 +201,39 @@ impl GeoUtils {
         let lat = Self::compact_bits(score);
         let lon = Self::compact_bits(score >> 1);
 
-        let grid_latitude_range = (
-            Self::MIN_LATITUDE + Self::LATITUDE_RANGE * (lat as f64) / ((1 << 26) as f64),
-            Self::MIN_LATITUDE + Self::LATITUDE_RANGE * ((lat + 1) as f64) / ((1 << 26) as f64),
-        );
+        // Use higher precision for intermediate calculations
+        let lat_f = lat as f64;
+        let lon_f = lon as f64;
+        let lat_plus_one = (lat + 1) as f64;
+        let lon_plus_one = (lon + 1) as f64;
+        let shift_26 = (1 << 26) as f64;
 
-        let grid_longitude_range = (
-            Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * (lon as f64) / ((1 << 26) as f64),
-            Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * ((lon + 1) as f64) / ((1 << 26) as f64),
-        );
+        // Calculate latitude and longitude ranges with higher precision
+        let lat_min = Self::MIN_LATITUDE + Self::LATITUDE_RANGE * lat_f / shift_26;
+        let lat_max = Self::MIN_LATITUDE + Self::LATITUDE_RANGE * lat_plus_one / shift_26;
+        
+        let lon_min = Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * lon_f / shift_26;
+        let lon_max = Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * lon_plus_one / shift_26;
 
-        return (
-            (grid_longitude_range.0 + grid_longitude_range.1) / 2.0,
-            (grid_latitude_range.0 + grid_latitude_range.1) / 2.0,
-        );
+        // Return the midpoints as f64 at the end
+        (
+            (lon_min + lon_max) / 2.0,
+            (lat_min + lat_max) / 2.0,
+        )
+    }
+
+    pub fn calculate_distance(from: f64, to: f64) -> f64 {
+        let (lon1, lat1) = Self::decode_score(from);
+        let (lon2, lat2) = Self::decode_score(to);
+        let lat1_rad = lat1.to_radians();
+        let lat2_rad = lat2.to_radians();
+        let d_lat = lat2_rad - lat1_rad;
+        let d_lon = (lon2 - lon1).to_radians();
+        const R: f64 = 6372797.560856; // Radius of the Earth in meters
+        let a = (d_lat / 2.0).sin().powi(2)
+            + lat1_rad.cos() * lat2_rad.cos() * (d_lon / 2.0).sin().powi(2);
+        let c = 2.0 * a.sqrt().asin();
+        R * c
     }
 }
 
@@ -225,5 +282,16 @@ mod tests {
                 decoded_latitude
             );
         }
+    }
+
+    #[test]
+    fn test_haversine() {
+        let score1 = GeoUtils::calculate_score(-86.67, 36.12);
+        let score2 = GeoUtils::calculate_score(-118.4, 33.94);
+        let distance = GeoUtils::calculate_distance(score1, score2);
+        assert!(
+            (distance - 2886444.062365684).abs() < 1e-6,
+            "Distance in meters should match"
+        );
     }
 }

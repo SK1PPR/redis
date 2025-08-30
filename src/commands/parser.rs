@@ -40,6 +40,7 @@ impl CommandParser {
             "XREAD" => Self::parse_xread(&args),
             "GEOADD" => Self::parse_geoadd(&args),
             "GEOPOS" => Self::parse_geopos(&args),
+            "GEODIST" => Self::parse_geodist(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -369,5 +370,16 @@ impl CommandParser {
             return Err("Wrong number of arguments for GEOPOS".to_string());
         }
         Ok(RedisCommand::GEOPOS(args[1].clone(), args[2..].to_vec()))
+    }
+
+    fn parse_geodist(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 4 {
+            return Err("Wrong number of arguments for GEODIST".to_string());
+        }
+        Ok(RedisCommand::GEODIST(
+            args[1].clone(),
+            args[2].clone(),
+            args[3].clone(),
+        ))
     }
 }

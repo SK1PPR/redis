@@ -295,6 +295,12 @@ impl CommandExecutor for RedisCommandExecutor {
                     .collect();
                 RedisResponse::Array(response_array)
             }
+            RedisCommand::GEODIST(key,from ,to ) => {
+                match self.storage.geodist(&key, &from, &to) {
+                    Some(distance) => RedisResponse::BulkString(Some(format!("{:.5}", distance))),
+                    None => RedisResponse::nil(),
+                }
+            }
         }
     }
 }
