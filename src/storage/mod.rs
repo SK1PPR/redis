@@ -1,4 +1,3 @@
-mod geo_member;
 pub mod memory;
 mod stream_member;
 pub mod unit;
