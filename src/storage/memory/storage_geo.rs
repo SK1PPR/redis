@@ -2,7 +2,13 @@ use super::{MemoryStorage, Storage, StorageGeo};
 use crate::storage::zset_member::ZSetMember;
 
 impl StorageGeo for MemoryStorage {
-    fn geoadd(&mut self, key: String, longitude: f64, latitude: f64, member: String) -> usize {
+    fn geoadd(
+        &mut self,
+        key: String,
+        longitude: f64,
+        latitude: f64,
+        member: String,
+    ) -> Result<usize, String> {
         log::debug!(
             "Adding member '{}' with coordinates ({}, {}) to geo set '{}'",
             member,
@@ -10,6 +16,14 @@ impl StorageGeo for MemoryStorage {
             latitude,
             key
         );
+
+        if !validate_latitude(latitude) || !validate_longitude(longitude) {
+            return Err(format!(
+                "invalid longitude,latitude pair {},{}",
+                longitude, latitude
+            ));
+        }
+
         let geo_member = ZSetMember::geo_member(longitude, latitude, member.clone(), 0.0);
         let unit = self.storage.get_mut(&key);
         match unit {
@@ -27,7 +41,7 @@ impl StorageGeo for MemoryStorage {
                     ));
                     let new_unit = crate::storage::Unit::new_zset(new_set, None);
                     self.storage.insert(key, new_unit);
-                    return 1;
+                    return Ok(1);
                 }
                 if let Some(zset) = u.implementation.as_zset_mut() {
                     // Check if member already exists
@@ -35,21 +49,29 @@ impl StorageGeo for MemoryStorage {
                         // ZSetMember exists, update coordinates
                         zset.retain(|m| m.member != geo_member.member); // Remove old entry
                         zset.insert(ZSetMember::geo_member(longitude, latitude, member, 0.0)); // Insert updated entry
-                        return 0;
+                        return Ok(0);
                     } else {
                         zset.insert(ZSetMember::geo_member(longitude, latitude, member, 0.0));
-                        return 1;
+                        return Ok(1);
                     }
                 }
-                0
+                Ok(0)
             }
             None => {
                 let mut new_set = std::collections::BTreeSet::new();
                 new_set.insert(ZSetMember::geo_member(longitude, latitude, member, 0.0));
                 let new_unit = crate::storage::Unit::new_zset(new_set, None);
                 self.storage.insert(key, new_unit);
-                1
+                Ok(1)
             }
         }
     }
+}
+
+fn validate_longitude(longitude: f64) -> bool {
+    longitude >= -180.0 && longitude <= 180.0
+}
+
+fn validate_latitude(latitude: f64) -> bool {
+    latitude >= -85.05112878 && latitude <= 85.05112878
 }

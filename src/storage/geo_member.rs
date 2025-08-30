@@ -29,6 +29,6 @@ impl Ord for GeoMember {
 
 impl GeoMember {
     pub fn to_string(&self) -> String {
-        format!("{}|{},{}", self.member, self.longitude, self.latitude)
+        format!("{}", self.member)
     }
 }

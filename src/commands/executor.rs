@@ -273,8 +273,13 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
             }
             RedisCommand::GEOADD(key, longitude, latitude, member) => {
-                let added = self.storage.geoadd(key, longitude, latitude, member);
-                RedisResponse::Integer(added as i64)
+                match self.storage.geoadd(key, longitude, latitude, member) {
+                    Ok(added) => RedisResponse::Integer(added as i64),
+                    Err(err_msg) => {
+                        log::debug!("GEOADD error: {}", err_msg);
+                        RedisResponse::error(&err_msg)
+                    }
+                }
             }
         }
     }
