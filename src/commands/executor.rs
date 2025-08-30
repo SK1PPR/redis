@@ -232,6 +232,42 @@ impl CommandExecutor for RedisCommandExecutor {
                 }
                 None => RedisResponse::Array(vec![]),
             },
+            RedisCommand::XREAD(block, streams) => match self.storage.xread(block, streams) {
+                Some(results) => {
+                    if results.is_empty() {
+                        RedisResponse::Array(vec![])
+                    } else {
+                        RedisResponse::Array(
+                            results
+                                .into_iter()
+                                .map(|(key, entries)| {
+                                    let entry_array: Vec<RedisResponse> = entries
+                                        .into_iter()
+                                        .map(|(id, fields)| {
+                                            let mut field_array = Vec::new();
+                                            for (field, value) in fields {
+                                                field_array
+                                                    .push(RedisResponse::BulkString(Some(field)));
+                                                field_array
+                                                    .push(RedisResponse::BulkString(Some(value)));
+                                            }
+                                            RedisResponse::Array(vec![
+                                                RedisResponse::BulkString(Some(id)),
+                                                RedisResponse::Array(field_array),
+                                            ])
+                                        })
+                                        .collect();
+                                    RedisResponse::Array(vec![
+                                        RedisResponse::BulkString(Some(key)),
+                                        RedisResponse::Array(entry_array),
+                                    ])
+                                })
+                                .collect(),
+                        )
+                    }
+                }
+                None => RedisResponse::NullArray,
+            },
         }
     }
 }

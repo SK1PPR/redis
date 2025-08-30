@@ -37,6 +37,7 @@ impl CommandParser {
             "TYPE" => Self::parse_type(&args),
             "XADD" => Self::parse_xadd(&args),
             "XRANGE" => Self::parse_xrange(&args),
+            "XREAD" => Self::parse_xread(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -295,5 +296,51 @@ impl CommandParser {
         let start = args[2].clone();
         let end = args[3].clone();
         Ok(RedisCommand::XRANGE(key, start, end))
+    }
+
+    fn parse_xread(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 4 {
+            return Err("Wrong number of arguments for XREAD".to_string());
+        }
+
+        let mut block_time: Option<u64> = None;
+        let mut idx = 1;
+
+        // Check for BLOCK option
+        if args[idx].to_uppercase() == "BLOCK" {
+            if args.len() < 6 {
+                return Err("Wrong number of arguments for XREAD with BLOCK".to_string());
+            }
+            block_time = Some(
+                args[idx + 1]
+                    .parse::<u64>()
+                    .map_err(|_| "Invalid BLOCK time value".to_string())?,
+            );
+            idx += 2;
+        }
+
+        if args[idx].to_uppercase() != "STREAMS" {
+            return Err("Expected 'STREAMS' keyword in XREAD".to_string());
+        }
+
+        idx += 1;
+
+        // Remaining arguments should be key-id pairs
+        if (args.len() - idx) % 2 != 0 {
+            return Err("Wrong number of arguments for XREAD key-id pairs".to_string());
+        }
+
+        let mut id_idx = (idx + args.len()) / 2;
+
+        let mut key_id_pairs = Vec::new();
+        while idx < id_idx && id_idx < args.len() {
+            let key = args[idx].clone();
+            let id = args[id_idx].clone();
+            key_id_pairs.push((key, id));
+            idx += 1;
+            id_idx += 1;
+        }
+
+        Ok(RedisCommand::XREAD(block_time, key_id_pairs))
     }
 }

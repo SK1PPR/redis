@@ -1,9 +1,9 @@
-pub mod parser;
 pub mod executor;
+pub mod parser;
 pub mod response;
 
-pub use parser::CommandParser;
 pub use executor::{CommandExecutor, RedisCommandExecutor};
+pub use parser::CommandParser;
 pub use response::RedisResponse;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,4 +35,5 @@ pub enum RedisCommand {
     TYPE(String),
     XADD(String, Option<String>, Vec<(String, String)>),
     XRANGE(String, String, String),
+    XREAD(Option<u64>,Vec<(String, String)>),
 }

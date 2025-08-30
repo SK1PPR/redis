@@ -88,6 +88,48 @@ impl StorageStream for MemoryStorage {
         }
         Some(result)
     }
+
+    fn xread(
+        &self,
+        block: Option<u64>,
+        streams: Vec<(String, String)>,
+    ) -> Option<Vec<(String, Vec<(String, Vec<(String, String)>)>)>> {
+        log::debug!(
+            "XREAD called with block {:?} and streams {:?}",
+            block,
+            streams
+        );
+        let mut result = Vec::new();
+
+        for (key, id) in streams {
+            let unit = self.storage.get(&key)?;
+            if unit.is_expired() || !unit.implementation.is_stream() {
+                log::debug!("Key '{}' has expired or is not a stream", key);
+                continue;
+            }
+            let stream = unit.implementation.as_stream()?;
+            let last_id = generate_query_id(&id);
+
+            let mut entries = Vec::new();
+            for member in stream {
+                if member.id > last_id {
+                    entries.push((member.id.to_string(), member.fields.clone()));
+                }
+            }
+            if !entries.is_empty() {
+                result.push((key.clone(), entries));
+            }
+        }
+
+        if result.is_empty() && block.is_some() {
+            // In a real implementation, we would block the client here.
+            // For this in-memory mock, we'll just return None to indicate no data.
+            log::debug!("No new entries found, would block for {:?}", block);
+            return None;
+        }
+
+        Some(result)
+    }
 }
 
 fn generate_next_id(last_id: &StreamId, input: &str) -> StreamId {
