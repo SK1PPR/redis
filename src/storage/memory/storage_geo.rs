@@ -60,28 +60,33 @@ impl StorageGeo for MemoryStorage {
         }
     }
 
-    fn geopos(&self, key: &str, member: &str) -> Option<(f64, f64)> {
+    fn geopos(&self, key: &str, members: Vec<String>) -> Vec<Option<(f64, f64)>> {
         log::debug!(
-            "Retrieving position of member '{}' from geo set '{}'",
-            member,
+            "Retrieving positions of members '{:?}' from geo set '{}'",
+            members,
             key
         );
+        
         let unit = self.storage.get(key);
         match unit {
             Some(u) => {
                 if u.is_expired() || !u.implementation.is_zset() {
                     log::debug!("Key '{}' has expired or is not a geo set", key);
-                    return None;
+                    return vec![None; members.len()];
                 }
+                
                 if let Some(zset) = u.implementation.as_zset() {
-                    if let Some(zset_member) = zset.iter().find(|m| m.member == member) {
-                        let (longitude, latitude) = GeoUtils::decode_score(zset_member.score);
-                        return Some((longitude, latitude));
-                    }
+                    // Process each member and collect results
+                    members.iter().map(|member| {
+                        zset.iter()
+                            .find(|m| m.member == *member)
+                            .map(|zset_member| GeoUtils::decode_score(zset_member.score))
+                    }).collect()
+                } else {
+                    vec![None; members.len()]
                 }
-                None
             }
-            None => None,
+            None => vec![None; members.len()],
         }
     }
 }

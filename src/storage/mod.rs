@@ -59,5 +59,5 @@ pub trait StorageStream {
 
 pub trait StorageGeo {
     fn geoadd(&mut self, key: String, longitude: f64, latitude: f64, member: String) -> Result<usize, String>;
-    fn geopos(&self, key: &str, member: &str) -> Option<(f64, f64)>;
+    fn geopos(&self, key: &str, member: Vec<String>) -> Vec<Option<(f64, f64)>>;
 }

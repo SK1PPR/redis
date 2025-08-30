@@ -365,9 +365,9 @@ impl CommandParser {
     }
 
     fn parse_geopos(args: &[String]) -> Result<RedisCommand, String> {
-        if args.len() != 3 {
+        if args.len() < 3 {
             return Err("Wrong number of arguments for GEOPOS".to_string());
         }
-        Ok(RedisCommand::GEOPOS(args[1].clone(), args[2].clone()))
+        Ok(RedisCommand::GEOPOS(args[1].clone(), args[2..].to_vec()))
     }
 }
