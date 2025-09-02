@@ -311,6 +311,26 @@ impl CommandExecutor for RedisCommandExecutor {
                 Some(distance) => RedisResponse::BulkString(Some(format!("{:.5}", distance))),
                 None => RedisResponse::nil(),
             },
+            RedisCommand::GEOSEARCH(key, lon, lat, use_radius, dist, unit) => {
+                match self
+                    .storage
+                    .geosearch(&key, lon, lat, use_radius, dist, unit)
+                {
+                    Some(members) => {
+                        if members.is_empty() {
+                            RedisResponse::Array(vec![])
+                        } else {
+                            RedisResponse::Array(
+                                members
+                                    .into_iter()
+                                    .map(|member| RedisResponse::SimpleString(member))
+                                    .collect(),
+                            )
+                        }
+                    }
+                    None => RedisResponse::Array(vec![]),
+                }
+            }
             RedisCommand::CONFIG(subcommand, parameter) => {
                 match subcommand.to_uppercase().as_str() {
                     "GET" => match self.storage.config_get(&parameter) {

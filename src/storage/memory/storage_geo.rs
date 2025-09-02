@@ -127,6 +127,76 @@ impl StorageGeo for MemoryStorage {
             None => None,
         }
     }
+
+    fn geosearch(
+        &self,
+        key: &str,
+        longitude: f64,
+        latitude: f64,
+        use_radius: bool,
+        distance: f64,
+        unit: String,
+    ) -> Option<Vec<String>> {
+        log::debug!(
+            "Searching geo set '{}' from point ({}, {}) with distance {} {}",
+            key,
+            longitude,
+            latitude,
+            distance,
+            unit
+        );
+
+        let dist_unit = DistUnit::from_str(unit)?;
+        let distance_meters = GeoUtils::convert_distance(distance, dist_unit);
+
+        let unit = self.storage.get(key);
+        match unit {
+            Some(u) => {
+                if u.is_expired() || !u.implementation.is_zset() {
+                    log::debug!("Key '{}' has expired or is not a geo set", key);
+                    return None;
+                }
+
+                if let Some(zset) = u.implementation.as_zset() {
+                    let center_score = GeoUtils::calculate_score(longitude, latitude);
+                    let mut results = Vec::new();
+
+                    for member in zset.iter() {
+                        let dist = GeoUtils::calculate_distance(center_score, member.score);
+                        if (use_radius && dist <= distance_meters)
+                            || (!use_radius && dist == distance_meters)
+                        {
+                            results.push(member.member.clone());
+                        }
+                    }
+
+                    Some(results)
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+}
+
+enum DistUnit {
+    Meters,
+    Kilometers,
+    Miles,
+    Feet,
+}
+
+impl DistUnit {
+    pub fn from_str(unit: String) -> Option<Self> {
+        match unit.to_lowercase().as_str() {
+            "m" => Some(DistUnit::Meters),
+            "km" => Some(DistUnit::Kilometers),
+            "mi" => Some(DistUnit::Miles),
+            "ft" => Some(DistUnit::Feet),
+            _ => None,
+        }
+    }
 }
 
 struct GeoUtils;
@@ -211,15 +281,12 @@ impl GeoUtils {
         // Calculate latitude and longitude ranges with higher precision
         let lat_min = Self::MIN_LATITUDE + Self::LATITUDE_RANGE * lat_f / shift_26;
         let lat_max = Self::MIN_LATITUDE + Self::LATITUDE_RANGE * lat_plus_one / shift_26;
-        
+
         let lon_min = Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * lon_f / shift_26;
         let lon_max = Self::MIN_LONGITUDE + Self::LONGITUDE_RANGE * lon_plus_one / shift_26;
 
         // Return the midpoints as f64 at the end
-        (
-            (lon_min + lon_max) / 2.0,
-            (lat_min + lat_max) / 2.0,
-        )
+        ((lon_min + lon_max) / 2.0, (lat_min + lat_max) / 2.0)
     }
 
     pub fn calculate_distance(from: f64, to: f64) -> f64 {
@@ -234,6 +301,15 @@ impl GeoUtils {
             + lat1_rad.cos() * lat2_rad.cos() * (d_lon / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().asin();
         R * c
+    }
+
+    pub fn convert_distance(distance_meters: f64, unit: DistUnit) -> f64 {
+        match unit {
+            DistUnit::Meters => distance_meters,
+            DistUnit::Kilometers => distance_meters / 1000.0,
+            DistUnit::Miles => distance_meters / 1609.344,
+            DistUnit::Feet => distance_meters * 3.28084,
+        }
     }
 }
 

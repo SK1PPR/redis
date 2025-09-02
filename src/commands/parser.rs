@@ -41,6 +41,7 @@ impl CommandParser {
             "GEOADD" => Self::parse_geoadd(&args),
             "GEOPOS" => Self::parse_geopos(&args),
             "GEODIST" => Self::parse_geodist(&args),
+            "GEOSEARCH" => Self::parse_geosearch(&args),
             "CONFIG" => Self::parse_config(&args),
             "KEYS" => Self::parse_keys(&args),
             _ => Err(format!("Unknown command: {}", command)),
@@ -407,5 +408,37 @@ impl CommandParser {
         }
 
         Ok(RedisCommand::KEYS(args[1].clone()))
+    }
+
+    fn parse_geosearch(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 8 {
+            return Err("Wrong number of arguments for GEOSEARCH".to_string());
+        }
+
+        assert_eq!(args[2].to_uppercase(), "FROMLONLAT");
+
+        let longitude = args[3]
+            .parse::<f64>()
+            .map_err(|_| "Invalid longitude value".to_string())?;
+        let latitude = args[4]
+            .parse::<f64>()
+            .map_err(|_| "Invalid latitude value".to_string())?;
+        let use_radius = match args[5].to_uppercase().as_str() {
+            "BYRADIUS" => true,
+            "BYBOX" => false,
+            _ => return Err("Invalid GEOSEARCH option, expected RADIUS or BOX".to_string()),
+        };
+        let distance = args[6]
+            .parse::<f64>()
+            .map_err(|_| "Invalid distance value".to_string())?;
+        let unit = args[7].clone();
+        Ok(RedisCommand::GEOSEARCH(
+            args[1].clone(),
+            longitude,
+            latitude,
+            use_radius,
+            distance,
+            unit,
+        ))
     }
 }
