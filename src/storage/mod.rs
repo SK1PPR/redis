@@ -3,6 +3,7 @@ mod stream_member;
 pub mod unit;
 mod zset_member;
 mod file_utils;
+pub mod repl_config;
 
 pub use memory::MemoryStorage;
 pub use unit::Unit;

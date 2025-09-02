@@ -1,5 +1,6 @@
 use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
+use crate::storage::repl_config::ReplConfig;
 use crate::storage::{MemoryStorage, Storage, StorageGeo, StorageList, StorageStream, StorageZSet};
 use mio::Token;
 
@@ -12,15 +13,20 @@ pub struct RedisCommandExecutor {
 }
 
 impl RedisCommandExecutor {
-    pub fn new(handle: EventLoopHandle) -> Self {
+    pub fn new(handle: EventLoopHandle, repl_config: ReplConfig) -> Self {
         Self {
-            storage: MemoryStorage::new(handle.clone()),
+            storage: MemoryStorage::new(handle.clone(), repl_config),
             handle,
         }
     }
 
-    pub fn new_with_file(handle: EventLoopHandle, directory: String, db_file_name: String) -> Self {
-        let mut storage = MemoryStorage::new(handle.clone());
+    pub fn new_with_file(
+        handle: EventLoopHandle,
+        directory: String,
+        db_file_name: String,
+        repl_config: ReplConfig,
+    ) -> Self {
+        let mut storage = MemoryStorage::new(handle.clone(), repl_config);
         storage.read_from_persistent_storage(&directory, &db_file_name);
         Self { storage, handle }
     }

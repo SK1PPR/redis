@@ -7,6 +7,7 @@ use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::file_utils::FileUtils;
 use crate::storage::stream_member::StreamId;
 use crate::storage::{Storage, StorageGeo, StorageList, StorageStream, StorageZSet, Unit};
+use crate::storage::repl_config::ReplConfig;
 
 mod storage;
 mod storage_geo;
@@ -84,16 +85,18 @@ pub struct MemoryStorage {
     blocked_clients: HashMap<String, Vec<BlockedClient>>,
     dir: Option<String>,
     dbfilename: Option<String>,
+    repl_config: ReplConfig,
 }
 
 impl MemoryStorage {
-    pub fn new(handle: EventLoopHandle) -> Self {
+    pub fn new(handle: EventLoopHandle, repl_config: ReplConfig) -> Self {
         Self {
             storage: HashMap::new(),
             handle,
             blocked_clients: HashMap::new(),
             dir: None,
             dbfilename: None,
+            repl_config
         }
     }
 

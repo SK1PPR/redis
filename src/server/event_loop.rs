@@ -3,6 +3,7 @@ use super::event_loop_handle::{EventLoopHandle, EventLoopMessage};
 use crate::commands::executor::Transactions;
 use crate::commands::{CommandExecutor, CommandParser, RedisCommandExecutor};
 use crate::protocol::RespParser;
+use crate::storage::repl_config::ReplConfig;
 use crate::RedisResponse;
 use mio::net::TcpListener;
 use mio::{Events, Interest, Poll, Token, Waker};
@@ -41,6 +42,7 @@ impl EventLoop {
         mut server: TcpListener,
         dir: String,
         dbfilename: String,
+        repl_config: ReplConfig,
     ) -> io::Result<Self> {
         let poll = Poll::new()?;
         let events = Events::with_capacity(128);
@@ -58,7 +60,12 @@ impl EventLoop {
             events,
             server,
             clients: HashMap::new(),
-            command_executor: RedisCommandExecutor::new_with_file(handle.clone(), dir, dbfilename),
+            command_executor: RedisCommandExecutor::new_with_file(
+                handle.clone(),
+                dir,
+                dbfilename,
+                repl_config,
+            ),
             next_token: 1, // 0 is reserved for server
             waker,
             message_receiver: receiver,
@@ -70,7 +77,7 @@ impl EventLoop {
         Ok(event_loop)
     }
 
-    pub fn new(mut server: TcpListener) -> io::Result<Self> {
+    pub fn new(mut server: TcpListener, repl_config: ReplConfig) -> io::Result<Self> {
         let poll = Poll::new()?;
         let events = Events::with_capacity(128);
         let waker = std::sync::Arc::new(Waker::new(poll.registry(), WAKER_TOKEN)?);
@@ -87,7 +94,7 @@ impl EventLoop {
             events,
             server,
             clients: HashMap::new(),
-            command_executor: RedisCommandExecutor::new(handle.clone()),
+            command_executor: RedisCommandExecutor::new(handle.clone(), repl_config),
             next_token: 1, // 0 is reserved for server
             waker,
             message_receiver: receiver,
