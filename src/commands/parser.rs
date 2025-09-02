@@ -44,6 +44,7 @@ impl CommandParser {
             "GEOSEARCH" => Self::parse_geosearch(&args),
             "CONFIG" => Self::parse_config(&args),
             "KEYS" => Self::parse_keys(&args),
+            "INFO" => Self::parse_info(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -440,5 +441,17 @@ impl CommandParser {
             distance,
             unit,
         ))
+    }
+
+    fn parse_info(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() > 2 {
+            return Err("Wrong number of arguments for INFO".to_string());
+        }
+        let section = if args.len() == 2 {
+            args[1].clone()
+        } else {
+            "".to_string()
+        };
+        Ok(RedisCommand::INFO(section))
     }
 }

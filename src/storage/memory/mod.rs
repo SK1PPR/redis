@@ -5,9 +5,9 @@ use std::time::Instant;
 use crate::commands::response::RedisResponse;
 use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::file_utils::FileUtils;
+use crate::storage::repl_config::ReplConfig;
 use crate::storage::stream_member::StreamId;
 use crate::storage::{Storage, StorageGeo, StorageList, StorageStream, StorageZSet, Unit};
-use crate::storage::repl_config::ReplConfig;
 
 mod storage;
 mod storage_geo;
@@ -96,7 +96,7 @@ impl MemoryStorage {
             blocked_clients: HashMap::new(),
             dir: None,
             dbfilename: None,
-            repl_config
+            repl_config,
         }
     }
 
@@ -326,5 +326,9 @@ impl MemoryStorage {
         }
         println!("Persistent storage file not found or invalid. Starting with empty storage.");
         log::info!("Persistent storage file not found or invalid. Starting with empty storage.");
+    }
+
+    pub fn get_info_replication(&self) -> String {
+        return self.repl_config.to_string();
     }
 }

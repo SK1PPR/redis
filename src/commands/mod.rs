@@ -41,5 +41,6 @@ pub enum RedisCommand {
     GEODIST(String, String, String),
     GEOSEARCH(String, f64, f64, bool, f64, String), // bool: use_radius, last parameter is unit
     CONFIG(String, String),
-    KEYS(String)
+    KEYS(String),
+    INFO(String),
 }

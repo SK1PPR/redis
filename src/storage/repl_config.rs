@@ -23,6 +23,13 @@ impl MasterConfig {
     fn generate_replication_id() -> String {
         Alphanumeric.sample_string(&mut rand::rng(), 40)
     }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "role:master\nconnected_slaves:{}\nmaster_replid:{}\nmaster_repl_offset:{}",
+            self.connected_slaves, self.replication_id, self.replication_offset
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +59,13 @@ impl SlaveConfig {
             connected: false,
         }
     }
+
+    pub fn to_string(&self) -> String {
+        format!(
+            "role:slave\nmaster_host:{}\nmaster_port:{}\nmaster_replid:{}\nmaster_repl_offset:{}\nconnected:{}",
+            self.master_host, self.master_port, self.replication_id, self.replication_offset, self.connected
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +87,13 @@ impl ReplConfig {
         match self {
             ReplConfig::Master(cfg) => format!("{}:{}", cfg.host, cfg.port),
             ReplConfig::Slave(cfg) => format!("{}:{}", cfg.host, cfg.port),
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            ReplConfig::Master(cfg) => cfg.to_string(),
+            ReplConfig::Slave(cfg) => cfg.to_string(),
         }
     }
 }

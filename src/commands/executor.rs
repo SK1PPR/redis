@@ -355,6 +355,10 @@ impl CommandExecutor for RedisCommandExecutor {
                     )
                 }
             }
+            RedisCommand::INFO(_) => {
+                let info = self.storage.get_info_replication();
+                RedisResponse::BulkString(Some(info))
+            }
         }
     }
 }
