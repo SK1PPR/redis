@@ -11,7 +11,8 @@ fn main() -> io::Result<()> {
     let mut dir = None;
     let mut dbfilename = None;
 
-    let mut slave_of = None;
+    let mut slave_of_host = None;
+    let mut slave_of_port = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -31,8 +32,12 @@ fn main() -> io::Result<()> {
                 i += 2;
             }
             "--replicaof" if i + 1 < args.len() => {
-                if let Ok(p) = args[i + 1].parse::<u16>() {
-                    slave_of = Some(p);
+                let parts: Vec<&str> = args[i + 1].split_whitespace().collect();
+                if parts.len() == 2 {
+                    slave_of_host = Some(parts[0].to_string());
+                    if let Ok(p) = parts[1].parse::<u16>() {
+                        slave_of_port = Some(p);
+                    }
                 }
                 i += 2;
             }
@@ -40,14 +45,10 @@ fn main() -> io::Result<()> {
         }
     }
 
-    let repl_config = if slave_of.is_some() {
-        let master_port = slave_of.unwrap();
-        ReplConfig::new_slave(
-            "127.0.0.1".to_string(),
-            port,
-            "127.0.0.1".to_string(),
-            master_port,
-        )
+    let repl_config = if slave_of_host.is_some() && slave_of_port.is_some() {
+        let master_port = slave_of_port.unwrap();
+        let master_host = slave_of_host.unwrap();
+        ReplConfig::new_slave("127.0.0.1".to_string(), port, master_host, master_port)
     } else {
         ReplConfig::new_master("127.0.0.1".to_string(), port)
     };
