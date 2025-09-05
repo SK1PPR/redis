@@ -32,6 +32,36 @@ impl RedisCommandExecutor {
         storage.read_from_persistent_storage(&directory, &db_file_name);
         Self { storage, handle }
     }
+
+    fn execute_subscribed(&mut self, command: RedisCommand, token: Token) -> RedisResponse {
+        log::debug!("Executing subscribed command: {:?}", command);
+        match command {
+            RedisCommand::SUBSCRIBE(channel) => {
+                if channel.is_empty() {
+                    return RedisResponse::error("No channels provided for SUBSCRIBE");
+                }
+                let count = self.storage.subscribe(token, channel.clone());
+                RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("subscribe".to_string())),
+                    RedisResponse::BulkString(Some(channel.clone())),
+                    RedisResponse::Integer(count as i64),
+                ])
+            }
+            RedisCommand::Ping(message) => match message {
+                Some(msg) => RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("pong".to_string())),
+                    RedisResponse::BulkString(Some(msg)),
+                ]),
+                None => RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("pong".to_string())),
+                    RedisResponse::BulkString(Some("".to_string())),
+                ]),
+            },
+            _ => RedisResponse::error(
+                format!("Can't execute command {:?} while subscribed", command).as_str(),
+            ),
+        }
+    }
 }
 
 pub trait Transactions {
@@ -63,6 +93,10 @@ impl Transactions for RedisCommandExecutor {
 impl CommandExecutor for RedisCommandExecutor {
     fn execute(&mut self, command: RedisCommand, token: Token) -> RedisResponse {
         log::debug!("Executing command: {:?}", command);
+
+        if self.storage.get_subscriptions(token).len() > 0 {
+            return self.execute_subscribed(command, token);
+        }
 
         match command {
             RedisCommand::Ping(message) => match message {
