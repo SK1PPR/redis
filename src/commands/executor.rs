@@ -58,7 +58,7 @@ impl RedisCommandExecutor {
                 ]),
             },
             _ => RedisResponse::error(
-                format!("Can't execute command {:?} while subscribed", command).as_str(),
+                format!("Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command.to_string()).as_str(),
             ),
         }
     }
