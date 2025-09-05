@@ -355,9 +355,18 @@ impl MemoryStorage {
     }
 
     pub fn get_channel_subscriptions(&self, channel: &str) -> Vec<mio::Token> {
-        self.pubsub
-            .get(channel)
-            .cloned()
-            .unwrap_or_else(Vec::new)
+        self.pubsub.get(channel).cloned().unwrap_or_else(Vec::new)
+    }
+
+    pub fn remove_subscriber(&mut self, token: mio::Token, channel: String) -> usize {
+        if let Some(subscribers) = self.pubsub.get_mut(&channel) {
+            subscribers.retain(|&t| t != token);
+            if subscribers.is_empty() {
+                self.pubsub.remove(&channel);
+                return 0;
+            }
+            return subscribers.len();
+        }
+        0
     }
 }

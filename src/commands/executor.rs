@@ -57,6 +57,17 @@ impl RedisCommandExecutor {
                     RedisResponse::BulkString(Some("".to_string())),
                 ]),
             },
+                        RedisCommand::UNSUBSCRIBE(channel) => {
+                if channel.is_empty() {
+                    return RedisResponse::error("No channels provided for UNSUBSCRIBE");
+                }
+                let count = self.storage.unsubscribe(token, channel.clone());
+                RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("unsubscribe".to_string())),
+                    RedisResponse::BulkString(Some(channel.clone())),
+                    RedisResponse::Integer(count as i64),
+                ])
+            },
             _ => RedisResponse::error(
                 format!("Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command.to_string()).as_str(),
             ),
@@ -407,12 +418,25 @@ impl CommandExecutor for RedisCommandExecutor {
                     RedisResponse::Integer(count as i64),
                 ])
             }
-            RedisCommand::PUBLISH(channel,message ) => {
+
+            RedisCommand::PUBLISH(channel, message) => {
                 if channel.is_empty() {
                     return RedisResponse::error("No channel provided for PUBLISH");
                 }
                 let count = self.storage.publish(channel.clone(), message.clone());
                 RedisResponse::Integer(count as i64)
+            }
+
+            RedisCommand::UNSUBSCRIBE(channel) => {
+                if channel.is_empty() {
+                    return RedisResponse::error("No channels provided for UNSUBSCRIBE");
+                }
+                let count = self.storage.unsubscribe(token, channel.clone());
+                RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("unsubscribe".to_string())),
+                    RedisResponse::BulkString(Some(channel.clone())),
+                    RedisResponse::Integer(count as i64),
+                ])
             }
         }
     }

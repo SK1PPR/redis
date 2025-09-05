@@ -71,4 +71,5 @@ pub trait StorageGeo {
 pub trait StoragePubSub {
     fn subscribe(&mut self, token: mio::Token, channel: String) -> usize;
     fn publish(&mut self, channel: String, message: String) -> usize;
+    fn unsubscribe(&mut self, token: mio::Token, channel: String) -> usize;
 }

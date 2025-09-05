@@ -14,4 +14,9 @@ impl StoragePubSub for MemoryStorage {
         }
         return subscribers.len();
     }
+
+    fn unsubscribe(&mut self, token: mio::Token, channel: String) -> usize {
+        self.remove_subscriber(token, channel);
+        self.get_subscriptions(token).len()
+    }
 }

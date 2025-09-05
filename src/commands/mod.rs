@@ -54,7 +54,8 @@ pub enum RedisCommand {
 
     // Pub/Sub Commands
     SUBSCRIBE(String),
-    PUBLISH(String, String)
+    PUBLISH(String, String),
+    UNSUBSCRIBE(String),
 }
 
 impl RedisCommand {
@@ -97,6 +98,7 @@ impl RedisCommand {
             RedisCommand::INFO(_) => "info".to_string(),
             RedisCommand::SUBSCRIBE(_) => "subscribe".to_string(),
             RedisCommand::PUBLISH(_, _) => "publish".to_string(),
+            RedisCommand::UNSUBSCRIBE(_) => "unsubscribe".to_string(),
         }
     }
 }
