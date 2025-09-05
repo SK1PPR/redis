@@ -5,4 +5,13 @@ impl StoragePubSub for MemoryStorage {
         self.add_subscriber(token, channel);
         self.get_subscriptions(token).len()
     }
+
+    fn publish(&mut self, channel: String, message: String) -> usize {
+        let subscribers = self.get_channel_subscriptions(channel.as_str());
+        for token in subscribers.clone() {
+            self.handle
+                .send_message(token, channel.clone(), message.clone());
+        }
+        return subscribers.len();
+    }
 }

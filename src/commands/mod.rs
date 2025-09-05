@@ -54,6 +54,7 @@ pub enum RedisCommand {
 
     // Pub/Sub Commands
     SUBSCRIBE(String),
+    PUBLISH(String, String)
 }
 
 impl RedisCommand {
@@ -95,6 +96,7 @@ impl RedisCommand {
             RedisCommand::KEYS(_) => "keys".to_string(),
             RedisCommand::INFO(_) => "info".to_string(),
             RedisCommand::SUBSCRIBE(_) => "subscribe".to_string(),
+            RedisCommand::PUBLISH(_, _) => "publish".to_string(),
         }
     }
 }

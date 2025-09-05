@@ -353,4 +353,11 @@ impl MemoryStorage {
         }
         channels
     }
+
+    pub fn get_channel_subscriptions(&self, channel: &str) -> Vec<mio::Token> {
+        self.pubsub
+            .get(channel)
+            .cloned()
+            .unwrap_or_else(Vec::new)
+    }
 }

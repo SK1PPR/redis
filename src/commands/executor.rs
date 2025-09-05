@@ -407,6 +407,13 @@ impl CommandExecutor for RedisCommandExecutor {
                     RedisResponse::Integer(count as i64),
                 ])
             }
+            RedisCommand::PUBLISH(channel,message ) => {
+                if channel.is_empty() {
+                    return RedisResponse::error("No channel provided for PUBLISH");
+                }
+                let count = self.storage.publish(channel.clone(), message.clone());
+                RedisResponse::Integer(count as i64)
+            }
         }
     }
 }

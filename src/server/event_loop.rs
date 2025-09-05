@@ -252,6 +252,20 @@ impl EventLoop {
                 EventLoopMessage::DiscardQueue { token } => {
                     self.discard_queue_internal(token)?;
                 }
+                EventLoopMessage::SendMessage {
+                    token,
+                    channel,
+                    message,
+                } => {
+                    self.write_response(
+                        token,
+                        RedisResponse::Array(vec![
+                            RedisResponse::BulkString(Some("message".to_string())),
+                            RedisResponse::BulkString(Some(channel)),
+                            RedisResponse::BulkString(Some(message)),
+                        ]),
+                    )?;
+                }
             }
         }
 

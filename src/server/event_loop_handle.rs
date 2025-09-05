@@ -21,6 +21,11 @@ pub enum EventLoopMessage {
     DiscardQueue {
         token: Token,
     },
+    SendMessage {
+        token: Token,
+        channel: String,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +92,21 @@ impl EventLoopHandle {
     pub fn start_multi(&self, token: Token) {
         if let Err(e) = self.sender.send(EventLoopMessage::StartMulti { token }) {
             log::error!("Failed to send StartMulti message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn send_message(&self, token: Token, channel: String, message: String) {
+        if let Err(e) = self.sender.send(EventLoopMessage::SendMessage {
+            token,
+            channel,
+            message,
+        }) {
+            log::error!("Failed to send SendMessage message: {}", e);
             return;
         }
 
