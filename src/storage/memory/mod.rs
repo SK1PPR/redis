@@ -7,11 +7,14 @@ use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::file_utils::FileUtils;
 use crate::storage::repl_config::ReplConfig;
 use crate::storage::stream_member::StreamId;
-use crate::storage::{Storage, StorageGeo, StorageList, StorageStream, StorageZSet, Unit};
+use crate::storage::{
+    Storage, StorageGeo, StorageList, StoragePubSub, StorageStream, StorageZSet, Unit,
+};
 
 mod storage;
 mod storage_geo;
 mod storage_list;
+mod storage_pub_sub;
 mod storage_stream;
 mod storage_zset;
 
@@ -86,6 +89,7 @@ pub struct MemoryStorage {
     dir: Option<String>,
     dbfilename: Option<String>,
     repl_config: ReplConfig,
+    pubsub: HashMap<String, Vec<mio::Token>>, // channel -> subscribers
 }
 
 impl MemoryStorage {
@@ -97,6 +101,7 @@ impl MemoryStorage {
             dir: None,
             dbfilename: None,
             repl_config,
+            pubsub: HashMap::new(),
         }
     }
 
@@ -330,5 +335,22 @@ impl MemoryStorage {
 
     pub fn get_info_replication(&self) -> String {
         return self.repl_config.to_string();
+    }
+
+    pub fn add_subscriber(&mut self, token: mio::Token, channel: String) {
+        self.pubsub
+            .entry(channel)
+            .or_insert_with(Vec::new)
+            .push(token);
+    }
+
+    pub fn get_subscriptions(&self, token: mio::Token) -> Vec<String> {
+        let mut channels = Vec::new();
+        for (channel, subscribers) in &self.pubsub {
+            if subscribers.contains(&token) {
+                channels.push(channel.clone());
+            }
+        }
+        channels
     }
 }

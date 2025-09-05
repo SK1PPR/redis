@@ -1,7 +1,9 @@
 use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::repl_config::ReplConfig;
-use crate::storage::{MemoryStorage, Storage, StorageGeo, StorageList, StorageStream, StorageZSet};
+use crate::storage::{
+    MemoryStorage, Storage, StorageGeo, StorageList, StoragePubSub, StorageStream, StorageZSet,
+};
 use mio::Token;
 
 pub trait CommandExecutor {
@@ -358,6 +360,18 @@ impl CommandExecutor for RedisCommandExecutor {
             RedisCommand::INFO(_) => {
                 let info = self.storage.get_info_replication();
                 RedisResponse::BulkString(Some(info))
+            }
+
+            RedisCommand::SUBSCRIBE(channel) => {
+                if channel.is_empty() {
+                    return RedisResponse::error("No channels provided for SUBSCRIBE");
+                }
+                let count = self.storage.subscribe(token, channel.clone());
+                RedisResponse::Array(vec![
+                    RedisResponse::BulkString(Some("subscribe".to_string())),
+                    RedisResponse::BulkString(Some(channel.clone())),
+                    RedisResponse::Integer(count as i64),
+                ])
             }
         }
     }

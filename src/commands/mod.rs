@@ -26,21 +26,32 @@ pub enum RedisCommand {
     MULTI,
     EXEC,
     DISCARD,
+
+    // Sorted Set Commands
     ZADD(String, f64, String),
     ZRANK(String, String),
     ZRANGE(String, i64, i64),
     ZCARD(String),
     ZSCORE(String, String),
     ZREM(String, String),
+
+    // Stream commands
     TYPE(String),
     XADD(String, Option<String>, Vec<(String, String)>),
     XRANGE(String, String, String),
     XREAD(Option<u64>,Vec<(String, String)>),
+
+    // Geo Spatial Commands
     GEOADD(String, f64, f64, String),
     GEOPOS(String, Vec<String>),
     GEODIST(String, String, String),
     GEOSEARCH(String, f64, f64, bool, f64, String), // bool: use_radius, last parameter is unit
+    
+    // Replication Commands
     CONFIG(String, String),
     KEYS(String),
     INFO(String),
+
+    // Pub/Sub Commands
+    SUBSCRIBE(String),
 }

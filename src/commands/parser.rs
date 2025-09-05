@@ -45,6 +45,7 @@ impl CommandParser {
             "CONFIG" => Self::parse_config(&args),
             "KEYS" => Self::parse_keys(&args),
             "INFO" => Self::parse_info(&args),
+            "SUBSCRIBE" => Self::parse_subscribe(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -453,5 +454,12 @@ impl CommandParser {
             "".to_string()
         };
         Ok(RedisCommand::INFO(section))
+    }
+
+    fn parse_subscribe(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() < 2 {
+            return Err("Wrong number of arguments for SUBSCRIBE".to_string());
+        }
+        Ok(RedisCommand::SUBSCRIBE(args[1].clone()))
     }
 }

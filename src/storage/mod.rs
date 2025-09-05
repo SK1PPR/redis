@@ -67,3 +67,7 @@ pub trait StorageGeo {
     fn geodist(&self, key: &str, member1: &str, member2: &str) -> Option<f64>;
     fn geosearch(&self, key: &str, longitude: f64, latitude: f64, use_radius: bool, distance: f64, unit: String) -> Option<Vec<String>>;
 }
+
+pub trait StoragePubSub {
+    fn subscribe(&mut self, token: mio::Token, channel: String) -> usize;
+}
