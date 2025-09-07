@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use codecrafters_redis::{server::RedisServer, storage::repl_config::ReplConfig};
+use redis_rs::{server::RedisServer, storage::repl_config::ReplConfig};
 use std::io;
 
 fn main() -> io::Result<()> {

@@ -68,17 +68,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fd1289c04a9ea8cb22300a459a72a385d7c73d3259e2ed7dcb2af674838cfa9"
 
 [[package]]
-name = "codecrafters-redis"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "log",
- "mio",
- "rand",
- "regex",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -260,6 +249,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "redis-rs"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "mio",
+ "rand",
+ "regex",
 ]
 
 [[package]]

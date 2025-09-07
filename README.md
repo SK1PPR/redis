@@ -1,34 +1,40 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/4cb0fd52-3fd6-4b0c-9dd7-f323262aa24d)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+## Redis server in Rust
 
-This is a starting point for Rust solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+This repository contains a Redis-compatible server implemented in Rust. It supports core commands like `PING`, `ECHO`, `SET`, `GET`, and includes event loop handling, RESP protocol parsing, and optional replication flags.
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+### Features
+- Replication (master/replica via `--replicaof`)
+- Sorted sets
+- Streams
+- Pub/Sub
+- Lists
+- Persistent storage (configurable `--dir`, `--dbfilename`)
+- Geospatial commands
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+### Requirements
+- Rust toolchain (1.70+ recommended)
 
-# Passing the first stage
-
-The entry point for your Redis implementation is in `src/main.rs`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
-
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+### Run
+```bash
+./your_program.sh --port 6379
 ```
 
-That's all!
+Or via Cargo directly:
+```bash
+cargo run --release -- --port 6379
+```
 
-# Stage 2 & beyond
+### Project layout
+- `src/main.rs`: CLI, startup, and configuration parsing
+- `src/lib.rs`: Library exports
+- `src/server/`: TCP server, event loop
+- `src/protocol/`: RESP encoder/decoder
+- `src/commands/`: Command parsing, execution, and responses
+- `src/storage/`: In-memory structures, persistence helpers, replication config
 
-Note: This section is for stages 2 and beyond.
+### Notes
+- Set data directory and RDB filename via `--dir` and `--dbfilename`.
+- Configure replication via `--replicaof "<host> <port>"`.
 
-1. Ensure you have `cargo (1.88)` installed locally
-1. Run `./your_program.sh` to run your Redis server, which is implemented in
-   `src/main.rs`. This command compiles your Rust project, so it might be slow
-   the first time you run it. Subsequent runs will be fast.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+### License
+MIT
