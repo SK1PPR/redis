@@ -37,6 +37,9 @@ pub struct EventLoop {
 
     // Multi operation tracking
     multi_clients: HashSet<Token>,
+
+    // Parser
+    resp_parser: RespParser,
 }
 
 impl EventLoop {
@@ -111,6 +114,7 @@ impl EventLoop {
             event_loop_handle: handle,
             blocked_clients_timeout: HashMap::new(),
             multi_clients: HashSet::new(),
+            resp_parser: RespParser::new(),
         })
     }
 
@@ -344,7 +348,7 @@ impl EventLoop {
     fn process_client_commands(&mut self, token: Token) -> io::Result<()> {
         let commands_and_consumed = {
             let client = self.clients.get(&token).unwrap();
-            RespParser::parse_commands(&client.read_buffer)
+            self.resp_parser.parse_commands(&client.read_buffer)
         };
 
         let (commands, bytes_consumed) = commands_and_consumed;
