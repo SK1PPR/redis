@@ -4,6 +4,7 @@ use crate::commands::executor::Transactions;
 use crate::commands::{CommandExecutor, CommandParser, RedisCommandExecutor};
 use crate::protocol::RespParser;
 use crate::storage::repl_config::ReplConfig;
+use crate::storage::comm_utils::CommunicationUtils;
 use crate::RedisResponse;
 use mio::net::TcpListener;
 use mio::{Events, Interest, Poll, Token, Waker};
@@ -14,6 +15,7 @@ use std::time::{Duration, Instant};
 
 const SERVER_TOKEN: Token = Token(0);
 const WAKER_TOKEN: Token = Token(usize::MAX);
+const MASTER_TOKEN: Token = Token(usize::MAX - 1); // Reserved token for master connection
 
 pub struct EventLoop {
     poll: Poll,
@@ -39,10 +41,24 @@ pub struct EventLoop {
 
 impl EventLoop {
     pub fn new_with_file(
-        mut server: TcpListener,
+        server: TcpListener,
         dir: String,
         dbfilename: String,
         repl_config: ReplConfig,
+    ) -> io::Result<Self> {
+        EventLoop::new_loop(server, repl_config, true, dbfilename, dir)
+    }
+
+    pub fn new(server: TcpListener, repl_config: ReplConfig) -> io::Result<Self> {
+        EventLoop::new_loop(server, repl_config, false, String::new(), String::new())
+    }
+
+    fn new_loop(
+        mut server: TcpListener,
+        repl_config: ReplConfig,
+        with_file: bool,
+        dbfilename: String,
+        dir: String,
     ) -> io::Result<Self> {
         let poll = Poll::new()?;
         let events = Events::with_capacity(128);
@@ -55,46 +71,43 @@ impl EventLoop {
         poll.registry()
             .register(&mut server, SERVER_TOKEN, Interest::READABLE)?;
 
-        let event_loop = EventLoop {
-            poll,
-            events,
-            server,
-            clients: HashMap::new(),
-            command_executor: RedisCommandExecutor::new_with_file(
+        let command_executor = if with_file {
+            RedisCommandExecutor::new_with_file(
                 handle.clone(),
                 dir,
                 dbfilename,
-                repl_config,
-            ),
-            next_token: 1, // 0 is reserved for server
-            waker,
-            message_receiver: receiver,
-            event_loop_handle: handle,
-            blocked_clients_timeout: HashMap::new(),
-            multi_clients: HashSet::new(),
+                repl_config.clone(),
+            )
+        } else {
+            RedisCommandExecutor::new(handle.clone(), repl_config.clone())
         };
 
-        Ok(event_loop)
-    }
+        // If we are a slave, attempt initial connection to master
+        let mut clients = HashMap::new();
+        if repl_config.is_slave() {
+            if let Some(mut master_stream) = CommunicationUtils::setup_replication(&repl_config)? {
+                log::info!("Setting up initial master connection");
 
-    pub fn new(mut server: TcpListener, repl_config: ReplConfig) -> io::Result<Self> {
-        let poll = Poll::new()?;
-        let events = Events::with_capacity(128);
-        let waker = std::sync::Arc::new(Waker::new(poll.registry(), WAKER_TOKEN)?);
+                // Register master connection for read events
+                poll.registry().register(
+                    &mut master_stream,
+                    MASTER_TOKEN,
+                    Interest::READABLE,
+                )?;
 
-        // Create communication channel
-        let (sender, receiver) = mpsc::channel();
-        let handle = EventLoopHandle::new(sender, std::sync::Arc::clone(&waker));
-        // Register server socket for accept events
-        poll.registry()
-            .register(&mut server, SERVER_TOKEN, Interest::READABLE)?;
+                let master_client = Client::new(master_stream, MASTER_TOKEN);
+                clients.insert(MASTER_TOKEN, master_client);
+            } else {
+                log::warn!("Could not connect to master during startup");
+            }
+        }
 
         Ok(EventLoop {
             poll,
             events,
             server,
-            clients: HashMap::new(),
-            command_executor: RedisCommandExecutor::new(handle.clone(), repl_config),
+            clients,
+            command_executor: command_executor,
             next_token: 1, // 0 is reserved for server
             waker,
             message_receiver: receiver,
@@ -205,6 +218,29 @@ impl EventLoop {
         loop {
             match self.server.accept() {
                 Ok((socket, addr)) => {
+                    // Check if we are a slave and this is the master connection
+                    if self.command_executor.is_slave_connection() {
+                        if let Some(master_addr) = self.command_executor.get_master_addr() {
+                            if addr.to_string() == master_addr {
+                                log::info!("Accepted master connection from {}", addr);
+                                let token = MASTER_TOKEN;
+
+                                let mut socket = socket;
+
+                                // Register master connection for read events
+                                self.poll.registry().register(
+                                    &mut socket,
+                                    token,
+                                    Interest::READABLE,
+                                )?;
+
+                                let client = Client::new(socket, token);
+                                self.clients.insert(token, client);
+                                continue;
+                            }
+                        }
+                    }
+
                     let token = Token(self.next_token);
                     self.next_token += 1;
 
@@ -350,6 +386,11 @@ impl EventLoop {
                 }
                 Err(error) => crate::commands::RedisResponse::error(&error),
             };
+
+            if token == MASTER_TOKEN {
+                // The command has been executed on the master, no need to send a response
+                return Ok(());
+            }
 
             // For blocking commands, the executor will handle the blocking via the handle
             // We only send responses for non-blocking commands here

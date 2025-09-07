@@ -1,9 +1,10 @@
+pub mod comm_utils;
+mod file_utils;
 pub mod memory;
+pub mod repl_config;
 mod stream_member;
 pub mod unit;
 mod zset_member;
-mod file_utils;
-pub mod repl_config;
 
 pub use memory::MemoryStorage;
 pub use unit::Unit;
@@ -62,14 +63,32 @@ pub trait StorageStream {
 }
 
 pub trait StorageGeo {
-    fn geoadd(&mut self, key: String, longitude: f64, latitude: f64, member: String) -> Result<usize, String>;
+    fn geoadd(
+        &mut self,
+        key: String,
+        longitude: f64,
+        latitude: f64,
+        member: String,
+    ) -> Result<usize, String>;
     fn geopos(&self, key: &str, member: Vec<String>) -> Vec<Option<(f64, f64)>>;
     fn geodist(&self, key: &str, member1: &str, member2: &str) -> Option<f64>;
-    fn geosearch(&self, key: &str, longitude: f64, latitude: f64, use_radius: bool, distance: f64, unit: String) -> Option<Vec<String>>;
+    fn geosearch(
+        &self,
+        key: &str,
+        longitude: f64,
+        latitude: f64,
+        use_radius: bool,
+        distance: f64,
+        unit: String,
+    ) -> Option<Vec<String>>;
 }
 
 pub trait StoragePubSub {
     fn subscribe(&mut self, token: mio::Token, channel: String) -> usize;
     fn publish(&mut self, channel: String, message: String) -> usize;
     fn unsubscribe(&mut self, token: mio::Token, channel: String) -> usize;
+}
+
+pub trait Replication {
+    fn add_replication_client(&mut self, token: mio::Token);
 }

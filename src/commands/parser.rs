@@ -48,6 +48,8 @@ impl CommandParser {
             "SUBSCRIBE" => Self::parse_subscribe(&args),
             "PUBLISH" => Self::parse_publish(&args),
             "UNSUBSCRIBE" => Self::parse_unsubscribe(&args),
+            "REPLCONF" => Self::parse_replconf(&args),
+            "PSYNC" => Self::parse_psync(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -477,5 +479,19 @@ impl CommandParser {
             return Err("Wrong number of arguments for UNSUBSCRIBE".to_string());
         }
         Ok(RedisCommand::UNSUBSCRIBE(args[1].clone()))
+    }
+
+    fn parse_replconf(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for REPLCONF".to_string());
+        }
+        Ok(RedisCommand::REPLCONF(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_psync(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 3 {
+            return Err("Wrong number of arguments for PSYNC".to_string());
+        }
+        Ok(RedisCommand::PSYNC(args[1].clone(), args[2].clone()))
     }
 }

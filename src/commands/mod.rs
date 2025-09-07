@@ -56,6 +56,10 @@ pub enum RedisCommand {
     SUBSCRIBE(String),
     PUBLISH(String, String),
     UNSUBSCRIBE(String),
+
+    // Replication Commands
+    REPLCONF(String, String),
+    PSYNC(String, String)
 }
 
 impl RedisCommand {
@@ -99,6 +103,8 @@ impl RedisCommand {
             RedisCommand::SUBSCRIBE(_) => "subscribe".to_string(),
             RedisCommand::PUBLISH(_, _) => "publish".to_string(),
             RedisCommand::UNSUBSCRIBE(_) => "unsubscribe".to_string(),
+            RedisCommand::REPLCONF(_, _) => "replconf".to_string(),
+            RedisCommand::PSYNC(_, _) => "psync".to_string(),
         }
     }
 }

@@ -2,7 +2,8 @@ use super::{RedisCommand, RedisResponse};
 use crate::server::event_loop_handle::EventLoopHandle;
 use crate::storage::repl_config::ReplConfig;
 use crate::storage::{
-    MemoryStorage, Storage, StorageGeo, StorageList, StoragePubSub, StorageStream, StorageZSet,
+    MemoryStorage, Replication, Storage, StorageGeo, StorageList, StoragePubSub, StorageStream,
+    StorageZSet,
 };
 use mio::Token;
 
@@ -72,6 +73,14 @@ impl RedisCommandExecutor {
                 format!("Can't execute '{}': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command.to_string()).as_str(),
             ),
         }
+    }
+
+    pub fn is_slave_connection(&self) -> bool {
+        self.storage.repl_config.is_slave()
+    }
+
+    pub fn get_master_addr(&self) -> Option<String> {
+        self.storage.repl_config.get_master_addr()
     }
 }
 
@@ -438,6 +447,20 @@ impl CommandExecutor for RedisCommandExecutor {
                     RedisResponse::Integer(count as i64),
                 ])
             }
+
+            RedisCommand::REPLCONF(_, _) => {
+                // Placeholder for REPLCONF command handling
+                self.storage.add_replication_client(token);
+                RedisResponse::ok()
+            }
+
+            RedisCommand::PSYNC(_, _) => RedisResponse::SimpleString(
+                format!(
+                    "FULLRESYNC {} 0",
+                    self.storage.repl_config.get_replication_id()
+                )
+                .to_string(),
+            ),
         }
     }
 }

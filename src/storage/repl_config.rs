@@ -96,4 +96,26 @@ impl ReplConfig {
             ReplConfig::Slave(cfg) => cfg.to_string(),
         }
     }
+
+    pub fn is_master(&self) -> bool {
+        matches!(self, ReplConfig::Master(_))
+    }
+
+    pub fn is_slave(&self) -> bool {
+        matches!(self, ReplConfig::Slave(_))
+    }
+
+    pub fn get_master_addr(&self) -> Option<String> {
+        match self {
+            ReplConfig::Slave(cfg) => Some(format!("{}:{}", cfg.master_host, cfg.master_port)),
+            _ => None,
+        }
+    }
+
+    pub fn get_replication_id(&self) -> String {
+        match self {
+            ReplConfig::Master(cfg) => cfg.replication_id.clone(),
+            ReplConfig::Slave(cfg) => cfg.replication_id.clone(),
+        }
+    }
 }

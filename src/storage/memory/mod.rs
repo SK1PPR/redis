@@ -1,5 +1,5 @@
 use mio::Token;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use crate::commands::response::RedisResponse;
@@ -8,9 +8,10 @@ use crate::storage::file_utils::FileUtils;
 use crate::storage::repl_config::ReplConfig;
 use crate::storage::stream_member::StreamId;
 use crate::storage::{
-    Storage, StorageGeo, StorageList, StoragePubSub, StorageStream, StorageZSet, Unit,
+    Replication, Storage, StorageGeo, StorageList, StoragePubSub, StorageStream, StorageZSet, Unit,
 };
 
+mod replication;
 mod storage;
 mod storage_geo;
 mod storage_list;
@@ -88,8 +89,9 @@ pub struct MemoryStorage {
     blocked_clients: HashMap<String, Vec<BlockedClient>>,
     dir: Option<String>,
     dbfilename: Option<String>,
-    repl_config: ReplConfig,
+    pub repl_config: ReplConfig,
     pubsub: HashMap<String, Vec<mio::Token>>, // channel -> subscribers
+    replication_clients: HashSet<mio::Token>,
 }
 
 impl MemoryStorage {
@@ -102,6 +104,7 @@ impl MemoryStorage {
             dbfilename: None,
             repl_config,
             pubsub: HashMap::new(),
+            replication_clients: HashSet::new(),
         }
     }
 

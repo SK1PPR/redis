@@ -47,11 +47,16 @@ fn main() -> io::Result<()> {
 
     let repl_config = if slave_of_host.is_some() && slave_of_port.is_some() {
         let master_port = slave_of_port.unwrap();
-        let master_host = slave_of_host.unwrap();
+        let mut master_host = slave_of_host.unwrap();
+        if master_host == "localhost" {
+            master_host = "127.0.0.1".to_string();
+        }
         ReplConfig::new_slave("127.0.0.1".to_string(), port, master_host, master_port)
     } else {
         ReplConfig::new_master("127.0.0.1".to_string(), port)
     };
+
+    println!("Starting Redis server on port {}", port);
 
     let mut server = RedisServer::new(dir, dbfilename, repl_config)?;
     server.run()
