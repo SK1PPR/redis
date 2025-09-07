@@ -28,8 +28,12 @@ pub enum EventLoopMessage {
     },
     SendFile {
         token: Token,
-        contents: Vec<u8>
-    }
+        contents: Vec<u8>,
+    },
+    SendCommand {
+        token: Token,
+        command: RedisResponse,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -120,11 +124,25 @@ impl EventLoopHandle {
     }
 
     pub fn send_file(&self, token: Token, contents: Vec<u8>) {
-        if let Err(e) = self.sender.send(EventLoopMessage::SendFile {
-            token,
-            contents,
-        }) {
+        if let Err(e) = self
+            .sender
+            .send(EventLoopMessage::SendFile { token, contents })
+        {
             log::error!("Failed to send SendFile message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn send_command(&self, token: Token, command: RedisResponse) {
+        if let Err(e) = self
+            .sender
+            .send(EventLoopMessage::SendCommand { token, command })
+        {
+            log::error!("Failed to send SendCommand message: {}", e);
             return;
         }
 

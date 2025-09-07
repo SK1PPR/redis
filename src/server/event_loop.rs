@@ -215,29 +215,6 @@ impl EventLoop {
         loop {
             match self.server.accept() {
                 Ok((socket, addr)) => {
-                    // Check if we are a slave and this is the master connection
-                    if self.command_executor.is_slave_connection() {
-                        if let Some(master_addr) = self.command_executor.get_master_addr() {
-                            if addr.to_string() == master_addr {
-                                log::info!("Accepted master connection from {}", addr);
-                                let token = MASTER_TOKEN;
-
-                                let mut socket = socket;
-
-                                // Register master connection for read events
-                                self.poll.registry().register(
-                                    &mut socket,
-                                    token,
-                                    Interest::READABLE,
-                                )?;
-
-                                let client = Client::new(socket, token);
-                                self.clients.insert(token, client);
-                                continue;
-                            }
-                        }
-                    }
-
                     let token = Token(self.next_token);
                     self.next_token += 1;
 
@@ -318,6 +295,10 @@ impl EventLoop {
                             )?;
                         }
                     }
+                }
+                EventLoopMessage::SendCommand { token, command } => {
+                    println!("Sending command to client {}: {}", token.0, command);
+                    self.write_response(token, command)?
                 }
             }
         }
@@ -405,7 +386,8 @@ impl EventLoop {
             };
 
             if token == MASTER_TOKEN {
-                // The command has been executed on the master, no need to send a response
+                // The command has been executed on the slave, no need to send a response
+                println!("Command executed on slave from master: {}", response);
                 return Ok(());
             }
 

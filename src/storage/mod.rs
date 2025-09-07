@@ -9,6 +9,8 @@ mod zset_member;
 pub use memory::MemoryStorage;
 pub use unit::Unit;
 
+use crate::commands::RedisCommand;
+
 pub trait Storage {
     fn get(&mut self, key: &str) -> Option<String>;
     fn set(&mut self, key: String, value: String);
@@ -92,4 +94,5 @@ pub trait StoragePubSub {
 pub trait Replication {
     fn add_replication_client(&mut self, token: mio::Token);
     fn send_file(&self, token: mio::Token);
+    fn replicate_command(&self, command: RedisCommand);
 }

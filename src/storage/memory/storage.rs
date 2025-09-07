@@ -14,6 +14,7 @@ impl Storage for MemoryStorage {
     }
 
     fn set(&mut self, key: String, value: String) {
+        println!("Setting key '{}' to '{}'", key, value);
         log::debug!("Setting key '{}' to '{}'", key, value);
         let unit = Unit::new_string(value, None);
         self.storage.insert(key, unit);

@@ -326,13 +326,11 @@ impl MemoryStorage {
                     );
                 }
                 None => {
-                    println!("Error reading persistent storage");
                     log::error!("Error reading persistent storage");
                 }
             }
             return;
         }
-        println!("Persistent storage file not found or invalid. Starting with empty storage.");
         log::info!("Persistent storage file not found or invalid. Starting with empty storage.");
     }
 
