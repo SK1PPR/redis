@@ -91,4 +91,5 @@ pub trait StoragePubSub {
 
 pub trait Replication {
     fn add_replication_client(&mut self, token: mio::Token);
+    fn send_file(&self, token: mio::Token);
 }

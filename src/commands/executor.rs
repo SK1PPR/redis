@@ -454,13 +454,16 @@ impl CommandExecutor for RedisCommandExecutor {
                 RedisResponse::ok()
             }
 
-            RedisCommand::PSYNC(_, _) => RedisResponse::SimpleString(
-                format!(
-                    "FULLRESYNC {} 0",
-                    self.storage.repl_config.get_replication_id()
+            RedisCommand::PSYNC(_, _) => {
+                self.storage.send_file(token);
+                RedisResponse::SimpleString(
+                    format!(
+                        "FULLRESYNC {} 0",
+                        self.storage.repl_config.get_replication_id()
+                    )
+                    .to_string(),
                 )
-                .to_string(),
-            ),
+            }
         }
     }
 }

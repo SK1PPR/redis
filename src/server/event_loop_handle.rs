@@ -26,6 +26,10 @@ pub enum EventLoopMessage {
         channel: String,
         message: String,
     },
+    SendFile {
+        token: Token,
+        contents: Vec<u8>
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +111,20 @@ impl EventLoopHandle {
             message,
         }) {
             log::error!("Failed to send SendMessage message: {}", e);
+            return;
+        }
+
+        if let Err(e) = self.waker.wake() {
+            log::error!("Failed to wake event loop: {}", e);
+        }
+    }
+
+    pub fn send_file(&self, token: Token, contents: Vec<u8>) {
+        if let Err(e) = self.sender.send(EventLoopMessage::SendFile {
+            token,
+            contents,
+        }) {
+            log::error!("Failed to send SendFile message: {}", e);
             return;
         }
 

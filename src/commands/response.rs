@@ -10,6 +10,7 @@ pub enum RedisResponse {
     Blocked, // Timeout in seconds
     Empty,
     NullArray,
+    FileContents(Vec<u8>)
 }
 
 impl RedisResponse {
@@ -29,6 +30,9 @@ impl RedisResponse {
             RedisResponse::Error(e) => format!("-ERR {}\r\n", e),
             RedisResponse::Empty | RedisResponse::Blocked => "".to_string(),
             RedisResponse::NullArray => "*-1\r\n".to_string(),
+            RedisResponse::FileContents(contents) => {
+                format!("${}\r\n", contents.len())
+            }
         }
     }
 

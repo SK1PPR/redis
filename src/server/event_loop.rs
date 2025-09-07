@@ -3,8 +3,8 @@ use super::event_loop_handle::{EventLoopHandle, EventLoopMessage};
 use crate::commands::executor::Transactions;
 use crate::commands::{CommandExecutor, CommandParser, RedisCommandExecutor};
 use crate::protocol::RespParser;
-use crate::storage::repl_config::ReplConfig;
 use crate::storage::comm_utils::CommunicationUtils;
+use crate::storage::repl_config::ReplConfig;
 use crate::RedisResponse;
 use mio::net::TcpListener;
 use mio::{Events, Interest, Poll, Token, Waker};
@@ -89,11 +89,8 @@ impl EventLoop {
                 log::info!("Setting up initial master connection");
 
                 // Register master connection for read events
-                poll.registry().register(
-                    &mut master_stream,
-                    MASTER_TOKEN,
-                    Interest::READABLE,
-                )?;
+                poll.registry()
+                    .register(&mut master_stream, MASTER_TOKEN, Interest::READABLE)?;
 
                 let master_client = Client::new(master_stream, MASTER_TOKEN);
                 clients.insert(MASTER_TOKEN, master_client);
@@ -301,6 +298,26 @@ impl EventLoop {
                             RedisResponse::BulkString(Some(message)),
                         ]),
                     )?;
+                }
+                EventLoopMessage::SendFile { token, contents } => {
+                    if let Some(client) = self.clients.get_mut(&token) {
+                        // Send RESP bulk string: $<length>\r\n<data>\r\n
+                        let resp_response = format!("${}\r\n", contents.len());
+                        client.add_response(resp_response);
+
+                        // Add the raw bytes directly to the write buffer
+                        client.write_buffer.extend_from_slice(&contents);
+
+                        client.state = super::client::ClientState::Writing;
+
+                        if client.has_pending_writes() {
+                            self.poll.registry().reregister(
+                                &mut client.socket,
+                                token,
+                                Interest::WRITABLE,
+                            )?;
+                        }
+                    }
                 }
             }
         }

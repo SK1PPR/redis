@@ -62,7 +62,10 @@ impl FileUtils {
             _ => {
                 // This should never happen as we're only shifting 6 bits right,
                 // but Rust requires exhaustive patterns
-                log::error!("Unexpected bit pattern in length encoding: {:#b}", first_byte >> 6);
+                log::error!(
+                    "Unexpected bit pattern in length encoding: {:#b}",
+                    first_byte >> 6
+                );
                 None
             }
         }
@@ -111,7 +114,10 @@ impl FileUtils {
                     Some((value as i32).to_string())
                 }
                 _ => {
-                    log::error!("Unsupported special string encoding: {:#x}", first_byte & 0x3F);
+                    log::error!(
+                        "Unsupported special string encoding: {:#x}",
+                        first_byte & 0x3F
+                    );
                     None
                 }
             }
@@ -123,7 +129,7 @@ impl FileUtils {
                 log::error!("String length {} exceeds buffer bounds", len);
                 return None;
             }
-            
+
             let result = String::from_utf8_lossy(&buffer[*pos..*pos + len]).to_string();
             *pos += len;
 
@@ -157,9 +163,8 @@ impl FileUtils {
         };
 
         // Convert expiry timestamp to system time if present
-        let expiry_systime = expiry_timestamp.map(|timestamp| {
-            UNIX_EPOCH + std::time::Duration::from_millis(timestamp)
-        });
+        let expiry_systime = expiry_timestamp
+            .map(|timestamp| UNIX_EPOCH + std::time::Duration::from_millis(timestamp));
 
         // Check if the key has expired
         if let Some(expiry_time) = expiry_systime {
@@ -176,7 +181,11 @@ impl FileUtils {
         // Convert SystemTime to u128 (milliseconds since epoch) for Unit::new_string
         let expiry_u128 = expiry_timestamp.map(|ts| ts as u128);
         db.insert(key.clone(), Unit::new_string(value, expiry_u128));
-        log::debug!("Parsed key-value pair: '{}' with expiry: {:?}", key, expiry_u128);
+        log::debug!(
+            "Parsed key-value pair: '{}' with expiry: {:?}",
+            key,
+            expiry_u128
+        );
         Some(())
     }
 
@@ -225,7 +234,10 @@ impl FileUtils {
         let mut stage = FileStage::Header;
         let mut pending_expiry: Option<u64> = None;
 
-        log::debug!("Starting RDB file parsing, file size: {} bytes", buffer.len());
+        log::debug!(
+            "Starting RDB file parsing, file size: {} bytes",
+            buffer.len()
+        );
 
         while position < buffer.len() {
             match stage {
@@ -235,17 +247,17 @@ impl FileUtils {
                         log::error!("RDB file too short for header");
                         return None;
                     }
-                    
+
                     if &buffer[position..position + 5] != b"REDIS" {
                         log::error!("Invalid RDB magic string");
                         return None;
                     }
-                    
+
                     position += 5;
-                    let version = std::str::from_utf8(&buffer[position..position + 4])
-                        .unwrap_or("unknown");
+                    let version =
+                        std::str::from_utf8(&buffer[position..position + 4]).unwrap_or("unknown");
                     position += 4;
-                    
+
                     log::debug!("Header parsed successfully, version: {}", version);
                     stage = FileStage::Metadata;
                 }
@@ -305,8 +317,10 @@ impl FileUtils {
                         }
                         0xFB => {
                             // Hash table size information
-                            let hash_table_size = Self::read_length_encoded(&buffer, &mut position)?;
-                            let expire_hash_size = Self::read_length_encoded(&buffer, &mut position)?;
+                            let hash_table_size =
+                                Self::read_length_encoded(&buffer, &mut position)?;
+                            let expire_hash_size =
+                                Self::read_length_encoded(&buffer, &mut position)?;
                             log::debug!(
                                 "Hash table size: {}, expire hash table size: {}",
                                 hash_table_size,
@@ -316,10 +330,12 @@ impl FileUtils {
                         0xFC => {
                             // Expiry time in milliseconds (8 bytes, little-endian)
                             if position + 8 > buffer.len() {
-                                log::error!("Invalid expiry format (milliseconds) - buffer too short");
+                                log::error!(
+                                    "Invalid expiry format (milliseconds) - buffer too short"
+                                );
                                 return None;
                             }
-                            
+
                             let mut timestamp: u64 = 0;
                             for i in 0..8 {
                                 timestamp |= (buffer[position + i] as u64) << (i * 8);
@@ -334,7 +350,7 @@ impl FileUtils {
                                 log::error!("Invalid expiry format (seconds) - buffer too short");
                                 return None;
                             }
-                            
+
                             let mut timestamp: u32 = 0;
                             for i in 0..4 {
                                 timestamp |= (buffer[position + i] as u32) << (i * 8);
@@ -342,7 +358,11 @@ impl FileUtils {
                             position += 4;
                             // Convert seconds to milliseconds
                             pending_expiry = Some(timestamp as u64 * 1000);
-                            log::debug!("Set pending expiry timestamp (s): {} ({}ms)", timestamp, timestamp as u64 * 1000);
+                            log::debug!(
+                                "Set pending expiry timestamp (s): {} ({}ms)",
+                                timestamp,
+                                timestamp as u64 * 1000
+                            );
                         }
                         _ => {
                             // Regular key-value pair (marker is the value type)
@@ -369,5 +389,29 @@ impl FileUtils {
 
         log::info!("Successfully loaded {} keys from RDB file", db.len());
         Some(db)
+    }
+
+    pub fn get_db_as_file() -> Vec<u8> {
+        // Convert hex string to Vec<u8>
+        let hex_string = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+        let mut bytes = Vec::with_capacity(hex_string.len() / 2);
+        
+        for i in (0..hex_string.len()).step_by(2) {
+            if i + 2 > hex_string.len() {
+            break;
+            }
+            let byte_str = &hex_string[i..i+2];
+            match u8::from_str_radix(byte_str, 16) {
+            Ok(byte) => bytes.push(byte),
+            Err(_) => {
+                log::error!("Invalid hex string at position {}: {}", i, byte_str);
+                return Vec::new();
+            }
+            }
+        }
+
+        println!("Generated byte array of length: {}", bytes.len());
+        
+        bytes
     }
 }
