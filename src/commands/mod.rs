@@ -59,7 +59,10 @@ pub enum RedisCommand {
 
     // Replication Commands
     REPLCONF(String, String),
-    PSYNC(String, String)
+    PSYNC(String, String),
+
+    // Authentication
+    Authenticate(String)
 }
 
 impl RedisCommand {
@@ -105,6 +108,7 @@ impl RedisCommand {
             RedisCommand::UNSUBSCRIBE(_) => "unsubscribe".to_string(),
             RedisCommand::REPLCONF(_, _) => "replconf".to_string(),
             RedisCommand::PSYNC(_, _) => "psync".to_string(),
+            RedisCommand::Authenticate(_) => "authenticate".to_string()
         }
     }
 }

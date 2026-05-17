@@ -26,7 +26,7 @@ impl Default for RespParser {
 impl RespParser {
     pub fn new() -> Self {
         Self {
-            expecting_rdb: true,
+            expecting_rdb: false,
             expected_rdb_size: None,
         }
     }

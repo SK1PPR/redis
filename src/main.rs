@@ -3,7 +3,9 @@ use redis_rs::{server::RedisServer, storage::repl_config::ReplConfig};
 use std::io;
 
 fn main() -> io::Result<()> {
-    env_logger::init();
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
 
     // Parse command line arguments
     let args: Vec<String> = std::env::args().collect();

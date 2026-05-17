@@ -178,7 +178,7 @@ impl CommandExecutor for RedisCommandExecutor {
                             RedisResponse::Array(
                                 items
                                     .into_iter()
-                                    .map(|item| RedisResponse::SimpleString(item))
+                                    .map(|item| RedisResponse::BulkString(Some(item)))
                                     .collect(),
                             )
                         }
@@ -199,7 +199,7 @@ impl CommandExecutor for RedisCommandExecutor {
                                 RedisResponse::Array(
                                     items
                                         .into_iter()
-                                        .map(|item| RedisResponse::SimpleString(item))
+                                        .map(|item| RedisResponse::BulkString(Some(item)))
                                         .collect(),
                                 )
                             }
@@ -254,7 +254,7 @@ impl CommandExecutor for RedisCommandExecutor {
                         RedisResponse::Array(
                             members
                                 .into_iter()
-                                .map(|member| RedisResponse::SimpleString(member))
+                                .map(|member| RedisResponse::BulkString(Some(member)))
                                 .collect(),
                         )
                     }
@@ -391,7 +391,7 @@ impl CommandExecutor for RedisCommandExecutor {
                             RedisResponse::Array(
                                 members
                                     .into_iter()
-                                    .map(|member| RedisResponse::SimpleString(member))
+                                    .map(|member| RedisResponse::BulkString(Some(member)))
                                     .collect(),
                             )
                         }
@@ -475,6 +475,10 @@ impl CommandExecutor for RedisCommandExecutor {
                     )
                     .to_string(),
                 )
+            }
+
+            RedisCommand::Authenticate(_) => {
+                RedisResponse::BulkString(Some("default".to_string()))
             }
         }
     }

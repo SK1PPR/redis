@@ -50,6 +50,7 @@ impl CommandParser {
             "UNSUBSCRIBE" => Self::parse_unsubscribe(&args),
             "REPLCONF" => Self::parse_replconf(&args),
             "PSYNC" => Self::parse_psync(&args),
+            "ACL" => Self::parse_authenticate(&args),
             _ => Err(format!("Unknown command: {}", command)),
         }
     }
@@ -493,5 +494,9 @@ impl CommandParser {
             return Err("Wrong number of arguments for PSYNC".to_string());
         }
         Ok(RedisCommand::PSYNC(args[1].clone(), args[2].clone()))
+    }
+
+    fn parse_authenticate(args: &[String]) -> Result<RedisCommand, String> {
+        Ok(RedisCommand::Authenticate(args[1].clone()))
     }
 }

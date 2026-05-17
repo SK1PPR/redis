@@ -36,6 +36,7 @@ impl RedisServer {
     }
 
     pub fn run(&mut self) -> io::Result<()> {
+        
         log::info!("Starting Redis server event loop");
         self.event_loop.run()
     }
