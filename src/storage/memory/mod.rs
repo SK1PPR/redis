@@ -92,6 +92,9 @@ pub struct MemoryStorage {
     pub repl_config: ReplConfig,
     pubsub: HashMap<String, Vec<mio::Token>>, // channel -> subscribers
     replication_clients: HashSet<mio::Token>,
+    zset_scores: HashMap<String, HashMap<String, f64>>,
+    zset_ranks: HashMap<String, HashMap<String, usize>>,
+    zset_rank_dirty: HashSet<String>,
 }
 
 impl MemoryStorage {
@@ -105,6 +108,9 @@ impl MemoryStorage {
             repl_config,
             pubsub: HashMap::new(),
             replication_clients: HashSet::new(),
+            zset_scores: HashMap::new(),
+            zset_ranks: HashMap::new(),
+            zset_rank_dirty: HashSet::new(),
         }
     }
 
@@ -118,10 +124,70 @@ impl MemoryStorage {
 
     pub fn clear(&mut self) {
         self.storage.clear();
+        self.zset_scores.clear();
+        self.zset_ranks.clear();
+        self.zset_rank_dirty.clear();
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &String> {
         self.storage.keys()
+    }
+
+    fn remove_zset_indexes(&mut self, key: &str) {
+        self.zset_scores.remove(key);
+        self.zset_ranks.remove(key);
+        self.zset_rank_dirty.remove(key);
+    }
+
+    fn rebuild_zset_indexes(&mut self, key: &str) {
+        let Some(zset) = self
+            .storage
+            .get(key)
+            .and_then(|unit| unit.implementation.as_zset())
+        else {
+            self.remove_zset_indexes(key);
+            return;
+        };
+
+        let mut scores = HashMap::with_capacity(zset.len());
+        let mut ranks = HashMap::with_capacity(zset.len());
+        for (rank, member) in zset.iter().enumerate() {
+            scores.insert(member.member.clone(), member.score);
+            ranks.insert(member.member.clone(), rank);
+        }
+        self.zset_scores.insert(key.to_string(), scores);
+        self.zset_ranks.insert(key.to_string(), ranks);
+        self.zset_rank_dirty.remove(key);
+    }
+
+    fn set_zset_score_index(&mut self, key: &str, member: &str, score: f64) {
+        self.zset_scores
+            .entry(key.to_string())
+            .or_insert_with(HashMap::new)
+            .insert(member.to_string(), score);
+        self.zset_rank_dirty.insert(key.to_string());
+    }
+
+    fn remove_zset_member_index(&mut self, key: &str, member: &str) {
+        if let Some(scores) = self.zset_scores.get_mut(key) {
+            scores.remove(member);
+        }
+        if let Some(ranks) = self.zset_ranks.get_mut(key) {
+            ranks.remove(member);
+        }
+        self.zset_rank_dirty.insert(key.to_string());
+    }
+
+    fn zset_score(&self, key: &str, member: &str) -> Option<f64> {
+        self.zset_scores
+            .get(key)
+            .and_then(|members| members.get(member).copied())
+    }
+
+    fn zset_rank(&self, key: &str, member: &str) -> Option<usize> {
+        self.zset_ranks
+            .get(key)
+            .and_then(|members| members.get(member).copied())
     }
 
     // Helper method to unblock clients waiting on a specific key

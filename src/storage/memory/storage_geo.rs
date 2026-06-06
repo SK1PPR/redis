@@ -1,4 +1,4 @@
-use super::{MemoryStorage, Storage, StorageGeo};
+use super::{MemoryStorage, StorageGeo};
 use crate::storage::zset_member::ZSetMember;
 
 impl StorageGeo for MemoryStorage {
@@ -24,40 +24,42 @@ impl StorageGeo for MemoryStorage {
             ));
         }
         let score = GeoUtils::calculate_score(longitude, latitude);
+        let old_score = self.zset_score(&key, &member);
+        let index_member = member.clone();
+        let mut added = 0;
         let unit = self.storage.get_mut(&key);
         match unit {
             Some(u) => {
                 if u.is_expired() || !u.implementation.is_zset() {
                     log::debug!("Key '{}' has expired or is not a geo set", key);
-                    self.delete(&key);
                     let mut new_set = std::collections::BTreeSet::new();
                     new_set.insert(ZSetMember { score, member });
                     let new_unit = crate::storage::Unit::new_zset(new_set, None);
-                    self.storage.insert(key, new_unit);
-                    return Ok(1);
-                }
-                if let Some(zset) = u.implementation.as_zset_mut() {
-                    // Check if member already exists
-                    if zset.iter().any(|m| m.member == member) {
-                        // ZSetMember exists, update coordinates
-                        zset.retain(|m| m.member != member); // Remove old entry
-                        zset.insert(ZSetMember { score, member }); // Insert updated entry
-                        return Ok(0);
+                    self.remove_zset_indexes(&key);
+                    self.storage.insert(key.clone(), new_unit);
+                    added = 1;
+                } else if let Some(zset) = u.implementation.as_zset_mut() {
+                    if let Some(previous_score) = old_score {
+                        zset.remove(&ZSetMember {
+                            score: previous_score,
+                            member: member.clone(),
+                        });
                     } else {
-                        zset.insert(ZSetMember { score, member });
-                        return Ok(1);
+                        added = 1;
                     }
+                    zset.insert(ZSetMember { score, member });
                 }
-                Ok(0)
             }
             None => {
                 let mut new_set = std::collections::BTreeSet::new();
                 new_set.insert(ZSetMember { score, member });
                 let new_unit = crate::storage::Unit::new_zset(new_set, None);
-                self.storage.insert(key, new_unit);
-                Ok(1)
+                self.storage.insert(key.clone(), new_unit);
+                added = 1;
             }
         }
+        self.set_zset_score_index(&key, &index_member, score);
+        Ok(added)
     }
 
     fn geopos(&self, key: &str, members: Vec<String>) -> Vec<Option<(f64, f64)>> {
@@ -75,15 +77,11 @@ impl StorageGeo for MemoryStorage {
                     return vec![None; members.len()];
                 }
 
-                if let Some(zset) = u.implementation.as_zset() {
+                if u.implementation.as_zset().is_some() {
                     // Process each member and collect results
                     members
                         .iter()
-                        .map(|member| {
-                            zset.iter()
-                                .find(|m| m.member == *member)
-                                .map(|zset_member| GeoUtils::decode_score(zset_member.score))
-                        })
+                        .map(|member| self.zset_score(key, member).map(GeoUtils::decode_score))
                         .collect()
                 } else {
                     vec![None; members.len()]
@@ -109,14 +107,10 @@ impl StorageGeo for MemoryStorage {
                     return None;
                 }
 
-                if let Some(zset) = u.implementation.as_zset() {
-                    let pos1 = zset.iter().find(|m| m.member == member1);
-                    let pos2 = zset.iter().find(|m| m.member == member2);
-
-                    match (pos1, pos2) {
-                        (Some(m1), Some(m2)) => {
-                            let distance = GeoUtils::calculate_distance(m1.score, m2.score);
-                            Some(distance)
+                if u.implementation.as_zset().is_some() {
+                    match (self.zset_score(key, member1), self.zset_score(key, member2)) {
+                        (Some(score1), Some(score2)) => {
+                            Some(GeoUtils::calculate_distance(score1, score2))
                         }
                         _ => None,
                     }
@@ -296,19 +290,19 @@ impl GeoUtils {
         let lat2_rad = lat2.to_radians();
         let d_lat = lat2_rad - lat1_rad;
         let d_lon = (lon2 - lon1).to_radians();
-        const R: f64 = 6372797.560856; // Radius of the Earth in meters
+        const R: f64 = 6371000.0; // Mean Earth radius in meters
         let a = (d_lat / 2.0).sin().powi(2)
             + lat1_rad.cos() * lat2_rad.cos() * (d_lon / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().asin();
         R * c
     }
 
-    pub fn convert_distance(distance_meters: f64, unit: DistUnit) -> f64 {
+    pub fn convert_distance(distance: f64, unit: DistUnit) -> f64 {
         match unit {
-            DistUnit::Meters => distance_meters,
-            DistUnit::Kilometers => distance_meters / 1000.0,
-            DistUnit::Miles => distance_meters / 1609.344,
-            DistUnit::Feet => distance_meters * 3.28084,
+            DistUnit::Meters => distance,
+            DistUnit::Kilometers => distance * 1000.0,
+            DistUnit::Miles => distance * 1609.344,
+            DistUnit::Feet => distance / 3.28084,
         }
     }
 }
@@ -369,5 +363,16 @@ mod tests {
             (distance - 2886444.062365684).abs() < 1e-6,
             "Distance in meters should match"
         );
+    }
+
+    #[test]
+    fn test_distance_unit_conversion_to_meters() {
+        assert_eq!(GeoUtils::convert_distance(1.0, DistUnit::Meters), 1.0);
+        assert_eq!(
+            GeoUtils::convert_distance(1.0, DistUnit::Kilometers),
+            1000.0
+        );
+        assert_eq!(GeoUtils::convert_distance(1.0, DistUnit::Miles), 1609.344);
+        assert!((GeoUtils::convert_distance(3.28084, DistUnit::Feet) - 1.0).abs() < 1e-12);
     }
 }

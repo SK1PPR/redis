@@ -497,6 +497,12 @@ impl CommandParser {
     }
 
     fn parse_authenticate(args: &[String]) -> Result<RedisCommand, String> {
+        if args.len() != 2 {
+            return Err("Wrong number of arguments for ACL WHOAMI".to_string());
+        }
+        if args[1].to_uppercase() != "WHOAMI" {
+            return Err("Unsupported ACL subcommand".to_string());
+        }
         Ok(RedisCommand::Authenticate(args[1].clone()))
     }
 }

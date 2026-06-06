@@ -4,19 +4,21 @@ use regex;
 impl Storage for MemoryStorage {
     fn get(&mut self, key: &str) -> Option<String> {
         log::debug!("Getting value for key '{}'", key);
-        let value = self.storage.get(key).cloned()?;
-        if value.is_expired() || !value.implementation.is_string() {
-            log::debug!("Key '{}' has expired", key);
-            self.delete(key);
-            return None; // Key has expired
+        match self.storage.get(key) {
+            Some(value) if value.is_expired() || !value.implementation.is_string() => {
+                log::debug!("Key '{}' has expired", key);
+                self.delete(key);
+                None
+            }
+            Some(value) => value.implementation.as_string().cloned(),
+            None => None,
         }
-        return value.implementation.as_string().cloned();
     }
 
     fn set(&mut self, key: String, value: String) {
-        println!("Setting key '{}' to '{}'", key, value);
         log::debug!("Setting key '{}' to '{}'", key, value);
         let unit = Unit::new_string(value, None);
+        self.remove_zset_indexes(&key);
         self.storage.insert(key, unit);
     }
 
@@ -32,11 +34,13 @@ impl Storage for MemoryStorage {
                         .as_millis(),
             ),
         );
+        self.remove_zset_indexes(&key);
         self.storage.insert(key.clone(), unit);
     }
 
     fn delete(&mut self, key: &str) -> bool {
         log::debug!("Deleting key '{}'", key);
+        self.remove_zset_indexes(key);
         self.storage.remove(key).is_some()
     }
 
@@ -68,6 +72,7 @@ impl Storage for MemoryStorage {
                         self.delete(&key);
                         // Initialize to 1 if expired
                         let unit = Unit::new_string("1".to_string(), None);
+                        self.remove_zset_indexes(&key);
                         self.storage.insert(key, unit);
                         return Some(1);
                     }
@@ -93,6 +98,7 @@ impl Storage for MemoryStorage {
         } else {
             // Key does not exist, initialize to 1
             let unit = Unit::new_string("1".to_string(), None);
+            self.remove_zset_indexes(&key);
             self.storage.insert(key, unit);
             return Some(1);
         }

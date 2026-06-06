@@ -118,7 +118,16 @@ impl CommandExecutor for RedisCommandExecutor {
             return self.execute_subscribed(command, token);
         }
 
-        match command.clone() {
+        let replication_command = match &command {
+            RedisCommand::Set(_, _)
+            | RedisCommand::Del(_)
+            | RedisCommand::SetWithExpiry(_, _, _)
+            | RedisCommand::RPUSH(_, _)
+            | RedisCommand::LPUSH(_, _) => Some(command.clone()),
+            _ => None,
+        };
+
+        match command {
             RedisCommand::Ping(message) => match message {
                 Some(msg) => RedisResponse::BulkString(Some(msg)),
                 None => RedisResponse::pong(),
@@ -129,20 +138,17 @@ impl CommandExecutor for RedisCommandExecutor {
                 None => RedisResponse::nil(),
             },
             RedisCommand::Set(key, value) => {
-                if self.is_slave_connection() {
-                    println!("SET called on slave");
-                } else {
-                    println!("SET called on master");
-                }
                 self.storage.set(key, value);
-                println!("Completed SET command");
-                self.storage.replicate_command(command.clone());
-                println!("Completed replication of SET command");
+                if let Some(command) = replication_command {
+                    self.storage.replicate_command(command);
+                }
                 RedisResponse::ok()
             }
             RedisCommand::Del(keys) => {
                 let deleted = self.storage.delete_multiple(keys);
-                self.storage.replicate_command(command.clone());
+                if let Some(command) = replication_command {
+                    self.storage.replicate_command(command);
+                }
                 RedisResponse::Integer(deleted as i64)
             }
             RedisCommand::Exists(keys) => {
@@ -151,17 +157,23 @@ impl CommandExecutor for RedisCommandExecutor {
             }
             RedisCommand::SetWithExpiry(key, value, expiry) => {
                 self.storage.set_with_expiry(key, value, expiry);
-                self.storage.replicate_command(command.clone());
+                if let Some(command) = replication_command {
+                    self.storage.replicate_command(command);
+                }
                 RedisResponse::ok()
             }
             RedisCommand::RPUSH(key, value) => {
                 let length = self.storage.rpush(key, value);
-                self.storage.replicate_command(command.clone());
+                if let Some(command) = replication_command {
+                    self.storage.replicate_command(command);
+                }
                 RedisResponse::Integer(length as i64)
             }
             RedisCommand::LPUSH(key, value) => {
                 let length = self.storage.lpush(key, value);
-                self.storage.replicate_command(command.clone());
+                if let Some(command) = replication_command {
+                    self.storage.replicate_command(command);
+                }
                 RedisResponse::Integer(length as i64)
             }
             RedisCommand::LLEN(key) => {
@@ -477,9 +489,7 @@ impl CommandExecutor for RedisCommandExecutor {
                 )
             }
 
-            RedisCommand::Authenticate(_) => {
-                RedisResponse::BulkString(Some("default".to_string()))
-            }
+            RedisCommand::Authenticate(_) => RedisResponse::BulkString(Some("default".to_string())),
         }
     }
 }

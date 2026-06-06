@@ -10,43 +10,45 @@ impl StorageZSet for MemoryStorage {
             score,
             key
         );
+        let old_score = self.zset_score(&key, &member);
+        let index_member = member.clone();
+        let mut added = 0;
         let unit = self.storage.get_mut(&key);
         match unit {
             Some(u) => {
                 if u.is_expired() || !u.implementation.is_zset() {
                     log::debug!("Key '{}' has expired or is not a sorted set", key);
-                    self.delete(&key);
                     let mut new_set = std::collections::BTreeSet::new();
                     new_set.insert(ZSetMember { score, member });
                     let new_unit = Unit::new_zset(new_set, None);
-                    self.storage.insert(key, new_unit);
-                    return 1;
-                }
-                if let Some(zset) = u.implementation.as_zset_mut() {
-                    // Check if member already exists
-                    if zset.iter().any(|m| m.member == member) {
-                        // ZSetMember exists, update score
-                        zset.retain(|m| m.member != member); // Remove old entry
-                        zset.insert(ZSetMember { score, member }); // Insert updated entry
-                        return 0;
+                    self.remove_zset_indexes(&key);
+                    self.storage.insert(key.clone(), new_unit);
+                    added = 1;
+                } else if let Some(zset) = u.implementation.as_zset_mut() {
+                    if let Some(previous_score) = old_score {
+                        zset.remove(&ZSetMember {
+                            score: previous_score,
+                            member: member.clone(),
+                        });
                     } else {
-                        zset.insert(ZSetMember { score, member });
-                        return 1;
+                        added = 1;
                     }
+                    zset.insert(ZSetMember { score, member });
                 }
-                0
             }
             None => {
                 let mut new_set = std::collections::BTreeSet::new();
                 new_set.insert(ZSetMember { score, member });
                 let new_unit = Unit::new_zset(new_set, None);
-                self.storage.insert(key, new_unit);
-                1
+                self.storage.insert(key.clone(), new_unit);
+                added = 1;
             }
         }
+        self.set_zset_score_index(&key, &index_member, score);
+        added
     }
 
-    fn zrank(&self, key: &str, member: &str) -> Option<usize> {
+    fn zrank(&mut self, key: &str, member: &str) -> Option<usize> {
         log::debug!(
             "Getting rank of member '{}' in sorted set '{}'",
             member,
@@ -57,13 +59,10 @@ impl StorageZSet for MemoryStorage {
             log::debug!("Key '{}' has expired or is not a sorted set", key);
             return None;
         }
-        let zset = unit.implementation.as_zset()?;
-        for (idx, m) in zset.iter().enumerate() {
-            if m.member == member {
-                return Some(idx);
-            }
+        if self.zset_rank_dirty.contains(key) {
+            self.rebuild_zset_indexes(key);
         }
-        None
+        self.zset_rank(key, member)
     }
 
     fn zrange(&self, key: &str, start: i64, end: i64) -> Option<Vec<String>> {
@@ -139,17 +138,12 @@ impl StorageZSet for MemoryStorage {
             log::debug!("Key '{}' has expired or is not a sorted set", key);
             return None;
         }
-        let zset = unit.implementation.as_zset()?;
-        for m in zset.iter() {
-            if m.member == member {
-                return Some(m.score);
-            }
-        }
-        None
+        self.zset_score(key, member)
     }
 
     fn zrem(&mut self, key: &str, member: &str) -> bool {
         log::debug!("Removing member '{}' from sorted set '{}'", member, key);
+        let old_score = self.zset_score(key, member);
         let unit = self.storage.get_mut(key);
         match unit {
             Some(u) => {
@@ -159,9 +153,16 @@ impl StorageZSet for MemoryStorage {
                     return false;
                 }
                 if let Some(zset) = u.implementation.as_zset_mut() {
-                    let initial_len = zset.len();
-                    zset.retain(|m| m.member != member);
-                    return zset.len() < initial_len;
+                    if let Some(score) = old_score {
+                        let removed = zset.remove(&ZSetMember {
+                            score,
+                            member: member.to_string(),
+                        });
+                        if removed {
+                            self.remove_zset_member_index(key, member);
+                        }
+                        return removed;
+                    }
                 }
                 false
             }
