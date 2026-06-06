@@ -3,6 +3,21 @@
 This repo includes a dependency-free benchmark harness that compares the Rust
 server with a local `redis-server` by sending pipelined RESP commands over TCP.
 
+## Benchmark Environment
+
+These are local development benchmarks, not official Redis benchmarks.
+
+- Redis server: `redis-server v=8.6.2 sha=f6c77b96 malloc=libc bits=64`
+- Redis CLI: `redis-cli 8.6.2`
+- Machine: Apple M2
+- OS: macOS / Darwin `25.5.0` arm64
+- Transport: local TCP loopback
+- Workload style: fixed pipelined RESP commands from `scripts/perf_compare.py`
+
+Treat these numbers as useful for regression tracking and bottleneck discovery,
+not as a universal performance claim. Redis is mature production software doing
+far more than this clone.
+
 ## Run
 
 ```bash
